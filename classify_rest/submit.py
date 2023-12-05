@@ -78,8 +78,7 @@ def submit_sbatch(
         --wrap="{bash_cmd}"
     """
     print(f"Submitting SBATCH job:\n\t{sbatch_cmd}\n")
-    job_out, job_err = submit_subprocess(sbatch_cmd, env_input=env_input)
-    return (job_out, job_err)
+    return submit_subprocess(sbatch_cmd, env_input=env_input)
 
 
 def schedule_setup(
@@ -102,6 +101,7 @@ def schedule_setup(
     if os.path.exists(chk_file):
         return
 
+    print("Running Setup ...")
     sbatch_cmd = f"""\
         #!/bin/env {sys.executable}
 
@@ -110,6 +110,7 @@ def schedule_setup(
         #SBATCH --time=01:00:00
         #SBATCH --cpus-per-task=4
         #SBATCH --mem-per-cpu=6G
+        #SBATCH --wait
 
         import os
         import sys
@@ -130,7 +131,6 @@ def schedule_setup(
     with open(py_script, "w") as ps:
         ps.write(sbatch_cmd)
     job_out, _err = submit_subprocess(f"sbatch {py_script}")
-    print("Finished setup")
 
 
 def schedule_workflow(

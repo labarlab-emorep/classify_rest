@@ -4,7 +4,7 @@ Description.
 
 Notes
 -----
-RSA_LABARSERV2
+RSA_LS2
 SING_AFNI
 
 Examples
@@ -48,7 +48,20 @@ def _get_args():
         default="sep",
         help=textwrap.dedent(
             """\
-            Select template mask
+            FSL model name
+            (default : %(default)s)
+            """
+        ),
+    )
+    parser.add_argument(
+        "--sess-list",
+        nargs="+",
+        default=["ses-day2", "ses-day3"],
+        choices=["ses-day2", "ses-day3", "ses-BAS1"],
+        type=str,
+        help=textwrap.dedent(
+            """\
+            List of session IDs
             (default : %(default)s)
             """
         ),
@@ -59,23 +72,13 @@ def _get_args():
         default="movies",
         help=textwrap.dedent(
             """\
-            Select template mask
+            Task name
             (default : %(default)s)
             """
         ),
     )
 
     required_args = parser.add_argument_group("Required Arguments")
-    required_args.add_argument(
-        "-e",
-        "--sess-list",
-        nargs="+",
-        default=["ses-day2", "ses-day3"],
-        choices=["ses-day2", "ses-day3", "ses-BAS1"],
-        help="List of subject IDs",
-        type=str,
-        required=True,
-    )
     required_args.add_argument(
         "-p",
         "--proj-name",
@@ -118,25 +121,31 @@ def main():
     helper.check_afni()
 
     #
+    dir_name = "EmoRep" if proj_name == "emorep" else "Archival"
     work_deriv = os.path.join(
         "/work",
         os.environ["USER"],
-        f"{proj_name}/classify_rest",
+        f"{dir_name}/classify_rest",
     )
     now_time = datetime.now()
-    log_dir = os.path.join(
-        os.path.dirname(work_deriv),
-        f"logs/classify_rest_{now_time.strftime('%y%m%d_%H%M')}",
-    )
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
+    # log_dir = os.path.join(
+    #     os.path.dirname(work_deriv),
+    #     "logs",
+    #     f"classify_rest_{now_time.strftime('%y%m%d_%H%M')}",
+    # )
+    log_dir = os.path.join(os.path.dirname(work_deriv), "logs", "test")
+    for chk_dir in [work_deriv, log_dir]:
+        if not os.path.exists(chk_dir):
+            os.makedirs(chk_dir)
 
     #
     submit.schedule_setup(
         proj_name, work_deriv, mask_name, model_name, task_name, log_dir
     )
+    return
 
     #
+    print("Submitting workflow ...")
     for subj in subj_list:
         submit.schedule_workflow(
             subj,

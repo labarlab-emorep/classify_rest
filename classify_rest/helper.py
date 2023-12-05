@@ -7,6 +7,7 @@ DataSync :
 """
 import os
 import glob
+import time
 from typing import Tuple, Union
 from classify_rest import submit
 
@@ -14,10 +15,10 @@ from classify_rest import submit
 def check_ras():
     """Check if RAS_LABARSERV2 exists in env."""
     try:
-        os.environ["RAS_LABARSERV2"]
+        os.environ["RSA_LS2"]
     except KeyError as e:
         raise Exception(
-            "No global variable 'RAS_LABARSERV2' defined in user env"
+            "No global variable 'RSA_LS2' defined in user env"
         ) from e
 
 
@@ -55,9 +56,9 @@ class DataSync:
         """Title."""
         emorep_path = "/mnt/keoki/experiments2/EmoRep"
         proj_dir = (
-            "Exp3_Classify_Archival"
+            "Exp2_Compute_Emotion"
             if self._proj_name == "emorep"
-            else "Exp2_Compute_Emotion"
+            else "Exp3_Classify_Archival"
         )
         return os.path.join(emorep_path, proj_dir)
 
@@ -108,14 +109,24 @@ class DataSync:
         """Title."""
         print(f"Downloading : {os.path.basename(file_path)}")
         src = f"{self._user}@{self._labarserv2_ip}:{file_path}"
-        job_out, job_err = self._submit_rsync(src, self._work_deriv)
+        _, _ = self._submit_rsync(src, self._work_deriv)
 
         #
-        if os.path.exists(file_path):
-            return file_path
-        else:
-            print(job_err.decode("utf-8"))
-            raise FileNotFoundError()
+        chk_dl = os.path.join(self._work_deriv, os.path.basename(file_path))
+        if not os.path.exists(chk_dl):
+            raise FileNotFoundError(f"Missing : {chk_dl}")
+        return chk_dl
+
+    def _submit_rsync(self, src: str, dst: str) -> Tuple:
+        """Execute rsync between DCC and labarserv2."""
+        bash_cmd = f"""\
+            rsync \
+            -e 'ssh -i {os.environ["RSA_LS2"]}' \
+            -rauv {src} {dst}
+        """
+        return submit.submit_subprocess(
+            bash_cmd,
+        )
 
     def dl_class_weight(
         self, model_name, task_name
@@ -182,18 +193,6 @@ class DataSync:
         rm_list = [x for x in all_files if "csv" not in x]
         for rm_path in rm_list:
             os.remove(rm_path)
-
-    def _submit_rsync(self, src: str, dst: str) -> Tuple:
-        """Execute rsync between DCC and labarserv2."""
-        bash_cmd = f"""\
-            rsync \
-            -e 'ssh -i {os.environ["RAS_LABARSERV2"]}' \
-            -rauv {src} {dst}
-        """
-        job_out, job_err = submit.submit_subprocess(
-            bash_cmd,
-        )
-        return (job_out, job_err)
 
     def clean_work(self, subj):
         """Remove file tree."""

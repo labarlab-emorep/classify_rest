@@ -33,14 +33,17 @@ def wf_setup(proj_name, work_deriv, mask_name, model_name, task_name, log_dir):
     mk_mask = fsl.group.ImportanceMask()
     mk_mask.mine_template(mask_path)
     for emo_name in emo_list:
-        print(f"Making weight mask for : {emo_name}")
-        df_emo = df_import[df_import["emo_id"] == emo_name]
-        df_emo = df_emo.drop("emo_id", axis=1).reset_index(drop=True)
         mask_path = os.path.join(
             work_deriv,
             f"weight_model-{model_name}_task-{task_name}_"
             + f"emo-{emo_name}_map.nii.gz",
         )
+        if os.path.exists(mask_path):
+            continue
+
+        print(f"Making weight mask for : {emo_name}")
+        df_emo = df_import[df_import["emo_id"] == emo_name]
+        df_emo = df_emo.drop("emo_id", axis=1).reset_index(drop=True)
         _ = mk_mask.make_mask(df_emo, mask_path, task_name)
 
 
