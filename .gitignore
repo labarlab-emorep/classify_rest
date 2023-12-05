@@ -1,2 +1,3 @@
 __pycache__
 *.egg-info
+classify_rest/for_testing.py

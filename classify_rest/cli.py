@@ -22,7 +22,6 @@ from argparse import ArgumentParser, RawTextHelpFormatter
 import classify_rest._version as ver
 from classify_rest import helper
 from classify_rest import submit
-from classify_rest import workflow
 
 
 # %%
@@ -133,14 +132,21 @@ def main():
         os.makedirs(log_dir)
 
     #
-    workflow.wf_setup(
+    submit.schedule_setup(
         proj_name, work_deriv, mask_name, model_name, task_name, log_dir
     )
 
     #
     for subj in subj_list:
         submit.schedule_workflow(
-            subj, sess_list, proj_name, mask_name, work_deriv, log_dir
+            subj,
+            sess_list,
+            proj_name,
+            mask_name,
+            model_name,
+            task_name,
+            work_deriv,
+            log_dir,
         )
 
 

@@ -94,6 +94,14 @@ def schedule_setup(
     -------
 
     """
+    chk_file = os.path.join(
+        work_deriv,
+        f"weight_model-{model_name}_task-{task_name}_"
+        + "emo-amusement_map.nii.gz",
+    )
+    if os.path.exists(chk_file):
+        return
+
     sbatch_cmd = f"""\
         #!/bin/env {sys.executable}
 
@@ -126,7 +134,14 @@ def schedule_setup(
 
 
 def schedule_workflow(
-    subj, sess_list, proj_name, mask_name, work_deriv, log_dir
+    subj,
+    sess_list,
+    proj_name,
+    mask_name,
+    model_name,
+    task_name,
+    work_deriv,
+    log_dir,
 ):
     """Schedule pipeline on compute cluster.
 
@@ -157,6 +172,8 @@ def schedule_workflow(
             "{subj}",
             {sess_list},
             "{mask_name}",
+            "{model_name}",
+            "{task_name}",
             "{work_deriv}",
         )
 
