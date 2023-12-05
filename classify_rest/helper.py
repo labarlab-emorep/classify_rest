@@ -7,7 +7,6 @@ DataSync :
 """
 import os
 import glob
-import time
 from typing import Tuple, Union
 from classify_rest import submit
 
@@ -70,9 +69,9 @@ class DataSync:
     def _keoki_deriv(self) -> Union[str, os.PathLike]:
         """Title."""
         mri_dir = (
-            "data_mri_BIDS"
+            "data_scanner_BIDS"
             if self._proj_name == "emorep"
-            else "data_scanner_BIDS"
+            else "data_mri_BIDS"
         )
         return os.path.join(self._keoki_proj, mri_dir, "derivatives")
 
@@ -157,16 +156,21 @@ class DataSync:
         self._subj = subj
         self._sess = sess
         self._rs_name = "res4d.nii.gz"
-        src = self._keoki_rs_path
+
+        #
         dst = os.path.join(self._work_deriv, self._subj, self._sess, "func")
         if not os.path.exists(dst):
             os.makedirs(dst)
+        res4d_list = sorted(glob.glob(f"{dst}/{self._rs_name}"))
+        if res4d_list:
+            return res4d_list[0]
 
         #
+        src = f"{self._user}@{self._labarserv2_ip}:{self._keoki_rs_path}"
         job_out, job_err = self._submit_rsync(src, dst)
         res4d_list = sorted(glob.glob(f"{dst}/{self._rs_name}"))
         if not res4d_list:
-            print(job_err.decode("utf-8"))
+            print(f"No res4d file detected for : {subj}, {sess}")
             return
         return res4d_list[0]
 

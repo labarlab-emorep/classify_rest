@@ -142,7 +142,6 @@ def main():
     submit.schedule_setup(
         proj_name, work_deriv, mask_name, model_name, task_name, log_dir
     )
-    return
 
     #
     print("Submitting workflow ...")

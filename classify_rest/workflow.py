@@ -55,7 +55,7 @@ def wf_emorep(subj, sess_list, mask_name, model_name, task_name, work_deriv):
             raise ValueError()
 
     #
-    ds = helper.DataSync("emorep", subj, work_deriv)
+    ds = helper.DataSync("emorep", work_deriv)
     res4d_dict = {}
     for sess in sess_list:
         res4d_path = ds.dl_rest(subj, sess)
@@ -73,7 +73,7 @@ def wf_emorep(subj, sess_list, mask_name, model_name, task_name, work_deriv):
 
     #
     for sess, res_path in res4d_dict.items():
-        do_dot = process.DoDot(work_deriv, res_path, mask_path)
+        do_dot = process.DoDot(res_path, mask_path)
         for weight_path in weight_maps:
             emo_name = (
                 os.path.basename(weight_path).split("emo-")[1].split("_")[0]
