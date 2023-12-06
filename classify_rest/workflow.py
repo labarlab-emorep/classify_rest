@@ -72,25 +72,10 @@ class ClassRest:
         self._task_name = task_name
         self._work_deriv = work_deriv
         self._log_dir = log_dir
-        self._check_spec()
+        helper.check_proj_sess(proj_name, sess_list)
 
         #
         self._ds = helper.DataSync(self._proj_name, self._work_deriv)
-
-    def _check_spec(self):
-        """Title."""
-        if self._proj_name not in ["emorep", "archival"]:
-            raise ValueError(f"Unexpected proj_name : {self._proj_name}")
-        if self._proj_name == "emorep":
-            for sess in self._sess_list:
-                if sess not in ["ses-day2", "ses-day3"]:
-                    raise ValueError(f"Unexpected session for emorep : {sess}")
-        elif self._proj_name == "archival":
-            for sess in self._sess_list:
-                if sess not in ["ses-BAS1"]:
-                    raise ValueError(
-                        f"Unexpected session for archival : {sess}"
-                    )
 
     def label_vols(self):
         """Title."""

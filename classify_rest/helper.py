@@ -2,6 +2,7 @@
 
 check_ras : check env for RSA key
 check_afni : check env for afni singularity path
+check_proj_sess : check if proj_name, sess list match
 DataSync : Manage data down/uploads
 
 """
@@ -31,11 +32,57 @@ def check_afni():
         ) from e
 
 
-class DataSync:
+def check_proj_sess(proj_name: str, sess_list: list):
+    """Check if proj_name, sess_list match."""
+    if proj_name not in ["emorep", "archival"]:
+        raise ValueError(f"Unexpected proj_name : {proj_name}")
+    if proj_name == "emorep":
+        for sess in sess_list:
+            if sess not in ["ses-day2", "ses-day3"]:
+                raise ValueError(f"Unexpected session for emorep : {sess}")
+    elif proj_name == "archival":
+        for sess in sess_list:
+            if sess not in ["ses-BAS1"]:
+                raise ValueError(
+                    f"Unexpected session for archival : {sess}"
+                )
+
+
+class _KeokiPaths:
+    """Make path properties available."""
+
+    def __init__(self, proj_name: str):
+        """Initialize."""
+        self._proj_name = proj_name
+
+    @property
+    def labarserv2_ip(self) -> str:
+        """Return local IP of labarserv2."""
+        return "ccn-labarserv2.vm.duke.edu"
+
+    @property
+    def keoki_emorep(self) -> Union[str, os.PathLike]:
+        """Return project parent directory path on Keoki."""
+        return "/mnt/keoki/experiments2/EmoRep"
+
+    @property
+    def keoki_deriv(self) -> Union[str, os.PathLike]:
+        """Return project derivatives path on Keoki."""
+        mri_dir = (
+            "Exp2_Compute_Emotion/data_scanner_BIDS"
+            if self._proj_name == "emorep"
+            else "Exp3_Classify_Archival/data_mri_BIDS"
+        )
+        return os.path.join(self.keoki_emorep, mri_dir, "derivatives")
+
+
+class DataSync(_KeokiPaths):
     """Synchronize data between DCC and Keoki.
 
     Download data from, and upload data to, Keoki using
     labarserv2.
+
+    Inherits _KeokiPaths.
 
     Methods
     -------
@@ -53,58 +100,21 @@ class DataSync:
     def __init__(self, proj_name: str, work_deriv: Union[str, os.PathLike]):
         """Initialize."""
         check_ras()
-        self._proj_name = proj_name
         self._work_deriv = work_deriv
         self._user = os.environ["USER"]
-
-    @property
-    def _keoki_proj(self) -> Union[str, os.PathLike]:
-        """Return project directory path on Keoki."""
-        emorep_path = "/mnt/keoki/experiments2/EmoRep"
-        proj_dir = (
-            "Exp2_Compute_Emotion"
-            if self._proj_name == "emorep"
-            else "Exp3_Classify_Archival"
-        )
-        return os.path.join(emorep_path, proj_dir)
-
-    @property
-    def _labarserv2_ip(self) -> str:
-        """Return IP of labarserv2."""
-        return "ccn-labarserv2.vm.duke.edu"
-
-    @property
-    def _keoki_deriv(self) -> Union[str, os.PathLike]:
-        """Return project derivatives path on Keoki."""
-        mri_dir = (
-            "data_scanner_BIDS"
-            if self._proj_name == "emorep"
-            else "data_mri_BIDS"
-        )
-        return os.path.join(self._keoki_proj, mri_dir, "derivatives")
-
-    @property
-    def _keoki_rs_path(self) -> Union[str, os.PathLike]:
-        """Return path to cleaned resting data on Keoki."""
-        return os.path.join(
-            self._keoki_deriv,
-            "model_fsl",
-            self._subj,
-            self._sess,
-            "func/run-01_level-first_name-rest.feat",
-            f"stats/{self._rs_name}",
-        )
+        super().__init__(proj_name)
 
     def dl_gm_mask(self, mask_name) -> Union[str, os.PathLike]:
         """Download tpl_GM_mask.nii.gz, return file path."""
-        # Check for existing file
         out_path = os.path.join(self._work_deriv, mask_name)
         if os.path.exists(out_path):
             return out_path
 
-        # Download, return file path
+        # Download template from Exp2, return file path
         src_path = os.path.join(
-            self._keoki_proj, "analyses/model_fsl_group", mask_name
+            self.keoki_emorep,
+            "Exp2_Compute_Emotion/analyses/model_fsl_group",
+            mask_name
         )
         return self._dl_file(src_path)
 
@@ -113,7 +123,7 @@ class DataSync:
     ) -> Union[str, os.PathLike]:
         """Submit download command for file, return file path."""
         print(f"Downloading : {os.path.basename(file_path)}")
-        src = f"{self._user}@{self._labarserv2_ip}:{file_path}"
+        src = f"{self._user}@{self.labarserv2_ip}:{file_path}"
         _, _ = self._submit_rsync(src, self._work_deriv)
 
         # Check for file, return path
@@ -137,7 +147,6 @@ class DataSync:
         self, model_name, task_name
     ) -> Union[str, os.PathLike]:
         """Download classifier weights, return file path."""
-        # Check for existing file
         weight_name = (
             f"level-first_name-{model_name}_task-{task_name}_"
             + "con-stimWashout_voxel-importance_weighted.tsv"
@@ -146,10 +155,11 @@ class DataSync:
         if os.path.exists(out_path):
             return out_path
 
-        # Download and return
+        # Download weight file from Exp2 and return path
         src_path = os.path.join(
-            self._keoki_proj,
-            "analyses/classify_fMRI_plsda/classifier_output",
+            self.keoki_emorep,
+            "Exp2_Compute_Emotion/analyses/classify_fMRI_plsda",
+            "classifier_output",
             weight_name,
         )
         return self._dl_file(src_path)
@@ -169,21 +179,33 @@ class DataSync:
             return res4d_list[0]
 
         # Download, check, and return file path
-        src = f"{self._user}@{self._labarserv2_ip}:{self._keoki_rs_path}"
-        job_out, job_err = self._submit_rsync(src, dst)
+        src = f"{self._user}@{self.labarserv2_ip}:{self._keoki_rs_path}"
+        _, _ = self._submit_rsync(src, dst)
         res4d_list = sorted(glob.glob(f"{dst}/{self._rs_name}"))
         if not res4d_list:
             print(f"No res4d file detected for : {subj}, {sess}")
             return
         return res4d_list[0]
 
+    @property
+    def _keoki_rs_path(self) -> Union[str, os.PathLike]:
+        """Return path to cleaned resting data on Keoki."""
+        return os.path.join(
+            self.keoki_deriv,
+            "model_fsl",
+            self._subj,
+            self._sess,
+            "func/run-01_level-first_name-rest.feat",
+            f"stats/{self._rs_name}",
+        )
+
     def ul_rest(self, subj: str):
         """Clean intermediates and upload relevant files to Keoki."""
         src = os.path.join(self._work_deriv, subj)
         self._clean_subj(src)
         dst = (
-            f"{self._user}@{self._labarserv2_ip}:"
-            + f"{self._keoki_deriv}/classify_rest"
+            f"{self._user}@{self.labarserv2_ip}:"
+            + f"{self.keoki_deriv}/classify_rest"
         )
         _, _ = self._submit_rsync(src, dst)
 

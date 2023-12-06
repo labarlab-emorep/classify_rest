@@ -11,5 +11,9 @@ setup(
             "classify_rest=classify_rest.cli:main",
         ]
     },
-    install_requires=["setuptools>=65.5.1"],
+    install_requires=[
+        "nibabel>=5.1.0",
+        "pandas>=2.1.3",
+        "setuptools>=65.5.1"
+    ],
 )

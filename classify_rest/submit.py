@@ -2,6 +2,7 @@
 
 submit_subprocess :
 submit_sbatch :
+schedule_setup :
 schedule_workflow :
 
 """
@@ -153,27 +154,6 @@ def schedule_workflow(
     -------
 
     """
-    # sbatch_cmd = f"""\
-    #     #!/bin/env {sys.executable}
-
-    #     #SBATCH --job-name=p{subj[4:]}
-    #     #SBATCH --output={log_dir}/par{subj[4:]}.txt
-    #     #SBATCH --time=02:00:00
-    #     #SBATCH --cpus-per-task=3
-    #     #SBATCH --mem-per-cpu=3G
-
-    #     from classify_rest import workflow
-
-    #     workflow.wf_{proj_name}(
-    #         "{subj}",
-    #         {sess_list},
-    #         "{mask_name}",
-    #         "{model_name}",
-    #         "{task_name}",
-    #         "{work_deriv}",
-    #         "{log_dir}",
-    #     )
-
     sbatch_cmd = f"""\
         #!/bin/env {sys.executable}
 

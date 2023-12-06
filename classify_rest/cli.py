@@ -9,8 +9,8 @@ SING_AFNI
 
 Examples
 --------
-classify_rest -p emorep -s sub-ER0016
-classify_rest -p archival -s sub-08326 sub-08399
+classify_rest -p emorep -e ses-day2 ses-day3 -s sub-ER0016
+classify_rest -p archival -e ses-BAS1 -s sub-08326 sub-08399
 
 """
 # %%
@@ -54,19 +54,6 @@ def _get_args():
         ),
     )
     parser.add_argument(
-        "--sess-list",
-        nargs="+",
-        default=["ses-day2", "ses-day3"],
-        choices=["ses-day2", "ses-day3", "ses-BAS1"],
-        type=str,
-        help=textwrap.dedent(
-            """\
-            List of session IDs
-            (default : %(default)s)
-            """
-        ),
-    )
-    parser.add_argument(
         "--task-name",
         choices=["movies", "scenarios", "all"],
         default="movies",
@@ -79,6 +66,15 @@ def _get_args():
     )
 
     required_args = parser.add_argument_group("Required Arguments")
+    required_args.add_argument(
+        "-e",
+        "--sess-list",
+        nargs="+",
+        choices=["ses-day2", "ses-day3", "ses-BAS1"],
+        type=str,
+        help="List of session IDs",
+        required=True,
+    )
     required_args.add_argument(
         "-p",
         "--proj-name",
@@ -119,6 +115,7 @@ def main():
     #
     helper.check_ras()
     helper.check_afni()
+    helper.check_proj_sess(proj_name, sess_list)
 
     #
     dir_name = "EmoRep" if proj_name == "emorep" else "Archival"
