@@ -9,7 +9,7 @@ SING_AFNI
 
 Examples
 --------
-classify_rest -p emorep -s sub-ER0009 sub-ER0016
+classify_rest -p emorep -s sub-ER0016
 classify_rest -p archival -s sub-08326 sub-08399
 
 """

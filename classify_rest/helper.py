@@ -194,9 +194,9 @@ class DataSync:
         for path, subdir, files in os.walk(sub_dir):
             for name in files:
                 all_files.append(os.path.join(path, name))
-        rm_list = [x for x in all_files if "csv" not in x]
-        for rm_path in rm_list:
-            os.remove(rm_path)
+        for file_path in all_files:
+            if "df_dot-product" not in file_path:
+                os.remove(file_path)
 
     def clean_work(self, subj):
         """Remove file tree."""

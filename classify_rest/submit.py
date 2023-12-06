@@ -108,12 +108,10 @@ def schedule_setup(
         #SBATCH --job-name=pSetup
         #SBATCH --output={log_dir}/parSetup.txt
         #SBATCH --time=01:00:00
-        #SBATCH --cpus-per-task=4
-        #SBATCH --mem-per-cpu=6G
+        #SBATCH --cpus-per-task=1
+        #SBATCH --mem-per-cpu=4G
         #SBATCH --wait
 
-        import os
-        import sys
         from classify_rest import workflow
 
         workflow.wf_setup(
@@ -160,12 +158,10 @@ def schedule_workflow(
 
         #SBATCH --job-name=p{subj[4:]}
         #SBATCH --output={log_dir}/par{subj[4:]}.txt
-        #SBATCH --time=05:00:00
-        #SBATCH --cpus-per-task=4
-        #SBATCH --mem-per-cpu=6G
+        #SBATCH --time=02:00:00
+        #SBATCH --cpus-per-task=3
+        #SBATCH --mem-per-cpu=3G
 
-        import os
-        import sys
         from classify_rest import workflow
 
         workflow.wf_{proj_name}(
@@ -175,6 +171,7 @@ def schedule_workflow(
             "{model_name}",
             "{task_name}",
             "{work_deriv}",
+            "{log_dir}",
         )
 
     """
