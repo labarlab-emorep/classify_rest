@@ -1,12 +1,14 @@
-"""Title.
+"""Methods for processing data.
 
-DoDot :
+DoDot : compute dot product between classifier weight matrix and
+        cleaned resting state volumes.
 
 """
 import os
 import sys
 import glob
 import textwrap
+from typing import Union
 from multiprocessing import Process
 import pandas as pd
 import nibabel as nib
@@ -16,31 +18,44 @@ from classify_rest import submit
 
 # %%
 class _DotProd:
-    """Title."""
+    """Calculate dot products.
 
-    def __init__(self, res_path, mask_path, num_vol, subj_deriv):
-        """Title."""
+    Writes a tmp_emo*_weight.csv to subject output directory.
+
+    Methods
+    -------
+    run_dot(*args)
+        Calculate dot products for all volumes
+
+    """
+
+    def __init__(
+        self,
+        res_path: Union[str, os.PathLike], mask_path: Union[str, os.PathLike],
+        num_vol: int, subj_deriv: Union[str, os.PathLike],
+    ):
+        """Initialize."""
         self._res_path = res_path
         self._mask_path = mask_path
         self._num_vol = num_vol
         self._subj_deriv = subj_deriv
 
-    def run_dot(self, emo_name, weight_path):
-        """Title."""
-        #
+    def run_dot(self, emo_name: str, weight_path: Union[str, os.PathLike]):
+        """Calc dot product for all volumes, write to csv."""
+        # Set attrs and start empty txt file
         self._weight_path = weight_path
         self._out_txt = os.path.join(
             self._subj_deriv, f"tmp_{emo_name}_weight.txt"
         )
         open(self._out_txt, "w").close()
 
-        #
+        # Calc dot product for each volume
         self._vol = 0
         while self._vol < self._num_vol:
             self._calc_dot()
             self._vol += 1
 
-        #
+        # Clean txt file of singularity verbiage, write csv
         out_csv = os.path.join(self._subj_deriv, f"tmp_{emo_name}_weight.csv")
         sing_list = ["Container", "Executing"]
         with open(self._out_txt) as tf, open(out_csv, "w") as cf:
@@ -50,7 +65,7 @@ class _DotProd:
         os.remove(self._out_txt)
 
     def _calc_dot(self):
-        """Title."""
+        """Submit dot product calculation."""
         dot_list = [
             "3ddot",
             f"-mask {self._mask_path}",
@@ -80,7 +95,42 @@ class _DotProd:
 
 # %%
 class DoDot:
-    """Title."""
+    """Conduct dot product calculations.
+
+    Compute dot product calculations between all emotion
+    classifier weight matrices and each volume of cleaned
+    resting state EPI.
+
+    Write output to subject derivatives location, and determine
+    label for each volume (maximum product).
+
+    Parameters
+    ----------
+    res_path : str, os.PathLike
+        Location of cleaned resting state data
+    mask_path : str, os.PathLike
+        Location of binary mask
+
+    Attributes
+    ----------
+    df_prod : pd.DataFrame
+        All dot product output and volume labels
+
+    Methods
+    -------
+    parallel_dot()
+        Parallelize the dot product calculations
+    label_vol()
+        Assign label for each volume from dot product ouput
+
+    Example
+    -------
+    dd = process.DoDot(*args)
+    dd.parallel_dot(*args)
+    dd.label_vol()
+    df = dd.df_prod
+
+    """
 
     def __init__(self, res_path, mask_path):
         """Initialize."""
@@ -95,14 +145,17 @@ class DoDot:
         img = nib.load(self._res_path)
         return img.header.get_data_shape()[-1]
 
-    def parallel_dot(self, weight_maps: list, subj, sess, log_dir):
-        """Title."""
+    def parallel_dot(
+        self, weight_maps: list, subj: str, sess: str,
+        log_dir: Union[str, os.PathLike]
+    ):
+        """Compute dot product of each weight map in parallel."""
         self._subj = subj
         self._sess = sess
         self._log_dir = log_dir
 
-        def _emo_name(weight_path):
-            """Title."""
+        def _emo_name(weight_path: Union[str, os.PathLike]) -> str:
+            """Return emotion name."""
             return os.path.basename(weight_path).split("emo-")[1].split("_")[0]
 
         # Run sessions in parallel
@@ -122,8 +175,8 @@ class DoDot:
             proc.join()
         print("Done : process.DoDot.parallel_dot", flush=True)
 
-    def _sbatch_dot(self, emo_name, weight_path):
-        """Title."""
+    def _sbatch_dot(self, emo_name: str, weight_path: Union[str, os.PathLike]):
+        """Submit sbatch job for dot product calculation."""
         job_name = f"dot_{self._subj[4:]}_{self._sess[4:]}_{emo_name}"
         sbatch_cmd = f"""\
             #!/bin/env {sys.executable}
@@ -152,14 +205,14 @@ class DoDot:
         _, _ = submit.submit_subprocess(f"sbatch {py_script}")
 
     def label_vol(self):
-        """Title."""
+        """Aggregate emotion dataframes and assign volume labels."""
         csv_list = sorted(glob.glob(f"{self._subj_deriv}/tmp_*csv"))
         if not csv_list:
             raise FileNotFoundError(
                 f"Expected csv files in {self._subj_deriv}"
             )
 
-        #
+        # Aggregate emotion dataframes
         self.df_prod = pd.DataFrame(
             data={"volume": list(range(1, self._num_vol + 1))}
         )
@@ -170,7 +223,7 @@ class DoDot:
             df = df.reset_index().rename(columns={"index": "volume"})
             self.df_prod = self.df_prod.merge(df, how="left", on="volume")
 
-        #
+        # Assign volume labels
         self.df_prod["vol_label"] = self.df_prod.idxmax(axis=1)
         for csv_file in csv_list:
             os.remove(csv_file)

@@ -1,16 +1,16 @@
-"""Title.
+"""Methods for submitting work to subprocess or SLURM scheduler.
 
-submit_subprocess :
-submit_sbatch :
-schedule_setup :
-schedule_workflow :
+submit_subprocess : execute bash in subprocess
+submit_sbatch : schedule bash command with SLURM
+schedule_setup : schedule setup workflow with SLURM
+schedule_workflow : schedule workflow.ClassRest with SLURM
 
 """
 import os
 import sys
 import subprocess
 import textwrap
-from typing import Tuple
+from typing import Tuple, Union
 
 
 def submit_subprocess(
@@ -27,43 +27,19 @@ def submit_subprocess(
 
 
 def submit_sbatch(
-    bash_cmd,
-    job_name,
-    log_dir,
-    num_hours=1,
-    num_cpus=1,
-    mem_gig=4,
-    env_input=None,
-):
+    bash_cmd: str,
+    job_name: str,
+    log_dir: Union[str, os.PathLike],
+    num_hours: int = 1,
+    num_cpus: int = 1,
+    mem_gig: int = 4,
+    env_input: dict = None,
+) -> Tuple:
     """Run bash commands as sbatch subprocess.
-
-    Parameters
-    ----------
-    bash_cmd : str
-        Bash syntax, work to schedule
-    job_name : str
-        Name for scheduler
-    log_dir : Path
-        Location of output dir for writing logs
-    num_hours : int, optional
-        Walltime to schedule
-    num_cpus : int, optional
-        Number of CPUs required by job
-    mem_gig : int, optional
-        Job RAM requirement for each CPU (GB)
-    env_input : os.environ, optional
-        Extra environmental variables required by processes
-        e.g. singularity reqs
-
-    Returns
-    -------
-    tuple
-        [0] = stdout of subprocess
-        [1] = stderr of subprocess
 
     Notes
     -----
-    Avoid using double quotes in <bash_cmd> (particularly relevant
+    Avoid using double quotes in bash_cmd (particularly relevant
     with AFNI) to avoid conflict with --wrap syntax.
 
     """
@@ -83,17 +59,10 @@ def submit_sbatch(
 
 
 def schedule_setup(
-    proj_name, work_deriv, mask_name, model_name, task_name, log_dir
+    proj_name: str, work_deriv: Union[str, os.PathLike], mask_name: str,
+    model_name: str, task_name: str, log_dir: Union[str, os.PathLike]
 ):
-    """Title
-
-    Parameters
-    ----------
-
-    Returns
-    -------
-
-    """
+    """Schedule workflow.wf_setup."""
     chk_file = os.path.join(
         work_deriv,
         f"weight_model-{model_name}_task-{task_name}_"
@@ -129,7 +98,7 @@ def schedule_setup(
     py_script = f"{log_dir}/run_classify_setup.py"
     with open(py_script, "w") as ps:
         ps.write(sbatch_cmd)
-    job_out, _err = submit_subprocess(f"sbatch {py_script}")
+    _, _ = submit_subprocess(f"sbatch {py_script}")
 
 
 def schedule_workflow(
@@ -142,18 +111,7 @@ def schedule_workflow(
     work_deriv,
     log_dir,
 ):
-    """Schedule pipeline on compute cluster.
-
-    Generate a python script that runs preprocessing workflow.
-    Submit the work on schedule resources.
-
-    Parameters
-    ----------
-
-    Returns
-    -------
-
-    """
+    """Schedule workflow.ClassRest."""
     sbatch_cmd = f"""\
         #!/bin/env {sys.executable}
 
