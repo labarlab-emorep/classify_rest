@@ -1,8 +1,8 @@
-"""Title.
+"""Helper methods.
 
-check_ras :
-check_afni :
-DataSync :
+check_ras : check env for RSA key
+check_afni : check env for afni singularity path
+DataSync : Manage data down/uploads
 
 """
 import os
@@ -12,7 +12,7 @@ from classify_rest import submit
 
 
 def check_ras():
-    """Check if RAS_LABARSERV2 exists in env."""
+    """Check if RSA_LS2 exists in env."""
     try:
         os.environ["RSA_LS2"]
     except KeyError as e:
@@ -32,19 +32,26 @@ def check_afni():
 
 
 class DataSync:
-    """Title.
+    """Synchronize data between DCC and Keoki.
+
+    Download data from, and upload data to, Keoki using
+    labarserv2.
 
     Methods
     -------
     dl_gm_mask()
+        Download tpl_GM_mask.nii.gz
     dl_class_weight()
+        Download classifier weights
     dl_rest()
+        Download cleaned resting state data (res4d.nii.gz)
     ul_rest()
+        Upload workflow output to Keoki
 
     """
 
     def __init__(self, proj_name: str, work_deriv: Union[str, os.PathLike]):
-        """Title."""
+        """Initialize."""
         check_ras()
         self._proj_name = proj_name
         self._work_deriv = work_deriv
@@ -52,7 +59,7 @@ class DataSync:
 
     @property
     def _keoki_proj(self) -> Union[str, os.PathLike]:
-        """Title."""
+        """Return project directory path on Keoki."""
         emorep_path = "/mnt/keoki/experiments2/EmoRep"
         proj_dir = (
             "Exp2_Compute_Emotion"
@@ -63,11 +70,12 @@ class DataSync:
 
     @property
     def _labarserv2_ip(self) -> str:
+        """Return IP of labarserv2."""
         return "ccn-labarserv2.vm.duke.edu"
 
     @property
     def _keoki_deriv(self) -> Union[str, os.PathLike]:
-        """Title."""
+        """Return project derivatives path on Keoki."""
         mri_dir = (
             "data_scanner_BIDS"
             if self._proj_name == "emorep"
@@ -77,7 +85,7 @@ class DataSync:
 
     @property
     def _keoki_rs_path(self) -> Union[str, os.PathLike]:
-        """Title."""
+        """Return path to cleaned resting data on Keoki."""
         return os.path.join(
             self._keoki_deriv,
             "model_fsl",
@@ -88,15 +96,13 @@ class DataSync:
         )
 
     def dl_gm_mask(self, mask_name) -> Union[str, os.PathLike]:
-        """Title."""
-        # TODO validate mask_name
-
-        #
+        """Download tpl_GM_mask.nii.gz, return file path."""
+        # Check for existing file
         out_path = os.path.join(self._work_deriv, mask_name)
         if os.path.exists(out_path):
             return out_path
 
-        #
+        # Download, return file path
         src_path = os.path.join(
             self._keoki_proj, "analyses/model_fsl_group", mask_name
         )
@@ -105,12 +111,12 @@ class DataSync:
     def _dl_file(
         self, file_path: Union[str, os.PathLike]
     ) -> Union[str, os.PathLike]:
-        """Title."""
+        """Submit download command for file, return file path."""
         print(f"Downloading : {os.path.basename(file_path)}")
         src = f"{self._user}@{self._labarserv2_ip}:{file_path}"
         _, _ = self._submit_rsync(src, self._work_deriv)
 
-        #
+        # Check for file, return path
         chk_dl = os.path.join(self._work_deriv, os.path.basename(file_path))
         if not os.path.exists(chk_dl):
             raise FileNotFoundError(f"Missing : {chk_dl}")
@@ -130,10 +136,8 @@ class DataSync:
     def dl_class_weight(
         self, model_name, task_name
     ) -> Union[str, os.PathLike]:
-        """Title."""
-        # TODO validate model_name, task
-
-        #
+        """Download classifier weights, return file path."""
+        # Check for existing file
         weight_name = (
             f"level-first_name-{model_name}_task-{task_name}_"
             + "con-stimWashout_voxel-importance_weighted.tsv"
@@ -142,7 +146,7 @@ class DataSync:
         if os.path.exists(out_path):
             return out_path
 
-        #
+        # Download and return
         src_path = os.path.join(
             self._keoki_proj,
             "analyses/classify_fMRI_plsda/classifier_output",
@@ -151,13 +155,12 @@ class DataSync:
         return self._dl_file(src_path)
 
     def dl_rest(self, subj: str, sess: str) -> Union[str, os.PathLike]:
-        """Title."""
-        #
+        """Download, return file path for subj/sess cleaned rest EPI."""
         self._subj = subj
         self._sess = sess
         self._rs_name = "res4d.nii.gz"
 
-        #
+        # Check for existing files
         dst = os.path.join(self._work_deriv, self._subj, self._sess, "func")
         if not os.path.exists(dst):
             os.makedirs(dst)
@@ -165,7 +168,7 @@ class DataSync:
         if res4d_list:
             return res4d_list[0]
 
-        #
+        # Download, check, and return file path
         src = f"{self._user}@{self._labarserv2_ip}:{self._keoki_rs_path}"
         job_out, job_err = self._submit_rsync(src, dst)
         res4d_list = sorted(glob.glob(f"{dst}/{self._rs_name}"))
@@ -175,21 +178,17 @@ class DataSync:
         return res4d_list[0]
 
     def ul_rest(self, subj: str):
-        """Title."""
-        #
+        """Clean intermediates and upload relevant files to Keoki."""
         src = os.path.join(self._work_deriv, subj)
         self._clean_subj(src)
-
-        #
-        dst = os.path.join(
-            f"{self._user}@{self._labarserv2_ip}:",
-            self._keoki_deriv,
-            "classify_rest/",
+        dst = (
+            f"{self._user}@{self._labarserv2_ip}:"
+            + f"{self._keoki_deriv}/classify_rest"
         )
         _, _ = self._submit_rsync(src, dst)
 
-    def _clean_subj(self, sub_dir):
-        """Title."""
+    def _clean_subj(self, sub_dir: Union[str, os.PathLike]):
+        """Clean intermediates for subject."""
         all_files = []
         for path, subdir, files in os.walk(sub_dir):
             for name in files:
@@ -198,7 +197,7 @@ class DataSync:
             if "df_dot-product" not in file_path:
                 os.remove(file_path)
 
-    def clean_work(self, subj):
+    def clean_work(self, subj: str):
         """Remove file tree."""
         rm_path = os.path.join(self._work_deriv, subj)
         _, _ = submit.submit_subprocess(f"rm -r {rm_path}")

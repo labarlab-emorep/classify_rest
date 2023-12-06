@@ -47,9 +47,6 @@ class _DotProd:
             for line in tf:
                 if not any(x in line for x in sing_list):
                     cf.write(line)
-
-        #
-        return
         os.remove(self._out_txt)
 
     def _calc_dot(self):
@@ -175,8 +172,5 @@ class DoDot:
 
         #
         self.df_prod["vol_label"] = self.df_prod.idxmax(axis=1)
-
-        #
-        return
         for csv_file in csv_list:
             os.remove(csv_file)
