@@ -32,6 +32,17 @@ def _get_args():
         description=ver_info + __doc__, formatter_class=RawTextHelpFormatter
     )
     parser.add_argument(
+        "--contrast-name",
+        choices=["stim", "replay", "tog"],
+        default="stim",
+        help=textwrap.dedent(
+            """\
+            Contrast name
+            (default : %(default)s)
+            """
+        ),
+    )
+    parser.add_argument(
         "--mask-name",
         choices=["tpl_GM_mask.nii.gz"],
         default="tpl_GM_mask.nii.gz",
@@ -111,6 +122,7 @@ def main():
     mask_name = args.mask_name
     model_name = args.model_name
     task_name = args.task_name
+    con_name = args.con_name
 
     #
     helper.check_ras()
@@ -137,7 +149,13 @@ def main():
 
     #
     submit.schedule_setup(
-        proj_name, work_deriv, mask_name, model_name, task_name, log_dir
+        proj_name,
+        work_deriv,
+        mask_name,
+        model_name,
+        task_name,
+        con_name,
+        log_dir,
     )
 
     #
@@ -150,6 +168,7 @@ def main():
             mask_name,
             model_name,
             task_name,
+            con_name,
             work_deriv,
             log_dir,
         )

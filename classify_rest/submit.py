@@ -59,8 +59,13 @@ def submit_sbatch(
 
 
 def schedule_setup(
-    proj_name: str, work_deriv: Union[str, os.PathLike], mask_name: str,
-    model_name: str, task_name: str, log_dir: Union[str, os.PathLike]
+    proj_name: str,
+    work_deriv: Union[str, os.PathLike],
+    mask_name: str,
+    model_name: str,
+    task_name: str,
+    con_name: str,
+    log_dir: Union[str, os.PathLike],
 ):
     """Schedule workflow.wf_setup."""
     chk_file = os.path.join(
@@ -90,6 +95,7 @@ def schedule_setup(
             "{mask_name}",
             "{model_name}",
             "{task_name}",
+            "{con_name}",
             "{log_dir}",
         )
 
@@ -108,6 +114,7 @@ def schedule_workflow(
     mask_name,
     model_name,
     task_name,
+    con_name,
     work_deriv,
     log_dir,
 ):
@@ -130,6 +137,7 @@ def schedule_workflow(
             "{mask_name}",
             "{model_name}",
             "{task_name}",
+            "{con_name}",
             "{work_deriv}",
             "{log_dir}",
         )

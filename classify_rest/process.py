@@ -31,8 +31,10 @@ class _DotProd:
 
     def __init__(
         self,
-        res_path: Union[str, os.PathLike], mask_path: Union[str, os.PathLike],
-        num_vol: int, subj_deriv: Union[str, os.PathLike],
+        res_path: Union[str, os.PathLike],
+        mask_path: Union[str, os.PathLike],
+        num_vol: int,
+        subj_deriv: Union[str, os.PathLike],
     ):
         """Initialize."""
         self._res_path = res_path
@@ -89,7 +91,7 @@ class _DotProd:
             f"--bind {weight_dir}:{weight_dir}",
             f"--bind {self._subj_deriv}:{self._subj_deriv}",
             f"--bind {self._subj_deriv}:/opt/home",
-            os.environ['SING_AFNI'],
+            os.environ["SING_AFNI"],
         ]
 
 
@@ -146,8 +148,11 @@ class DoDot:
         return img.header.get_data_shape()[-1]
 
     def parallel_dot(
-        self, weight_maps: list, subj: str, sess: str,
-        log_dir: Union[str, os.PathLike]
+        self,
+        weight_maps: list,
+        subj: str,
+        sess: str,
+        log_dir: Union[str, os.PathLike],
     ):
         """Compute dot product of each weight map in parallel."""
         self._subj = subj

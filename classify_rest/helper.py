@@ -43,9 +43,7 @@ def check_proj_sess(proj_name: str, sess_list: list):
     elif proj_name == "archival":
         for sess in sess_list:
             if sess not in ["ses-BAS1"]:
-                raise ValueError(
-                    f"Unexpected session for archival : {sess}"
-                )
+                raise ValueError(f"Unexpected session for archival : {sess}")
 
 
 class _KeokiPaths:
@@ -114,7 +112,7 @@ class DataSync(_KeokiPaths):
         src_path = os.path.join(
             self.keoki_emorep,
             "Exp2_Compute_Emotion/analyses/model_fsl_group",
-            mask_name
+            mask_name,
         )
         return self._dl_file(src_path)
 
@@ -144,12 +142,15 @@ class DataSync(_KeokiPaths):
         )
 
     def dl_class_weight(
-        self, model_name, task_name
+        self,
+        model_name: str,
+        task_name: str,
+        con_name: str,
     ) -> Union[str, os.PathLike]:
         """Download classifier weights, return file path."""
         weight_name = (
             f"level-first_name-{model_name}_task-{task_name}_"
-            + "con-stimWashout_voxel-importance_weighted.tsv"
+            + f"con-{con_name}Washout_voxel-importance_weighted.tsv"
         )
         out_path = os.path.join(self._work_deriv, weight_name)
         if os.path.exists(out_path):

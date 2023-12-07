@@ -15,13 +15,15 @@ from func_model.resources import fsl
 
 
 # %%
-def wf_setup(proj_name, work_deriv, mask_name, model_name, task_name, log_dir):
+def wf_setup(
+    proj_name, work_deriv, mask_name, model_name, task_name, con_name, log_dir
+):
     """Title."""
     print("Running workflow.wf_setup ...")
     #
     ds = helper.DataSync(proj_name, work_deriv)
     mask_path = ds.dl_gm_mask(mask_name)
-    weight_path = ds.dl_class_weight(model_name, task_name)
+    weight_path = ds.dl_class_weight(model_name, task_name, con_name)
 
     #
     df_import = pd.read_csv(weight_path, sep="\t")
@@ -38,7 +40,7 @@ def wf_setup(proj_name, work_deriv, mask_name, model_name, task_name, log_dir):
         mask_path = os.path.join(
             work_deriv,
             f"weight_model-{model_name}_task-{task_name}_"
-            + f"emo-{emo_name}_map.nii.gz",
+            + f"con-{con_name}_emo-{emo_name}_map.nii.gz",
         )
         if os.path.exists(mask_path):
             continue
@@ -47,6 +49,12 @@ def wf_setup(proj_name, work_deriv, mask_name, model_name, task_name, log_dir):
         df_emo = df_import[df_import["emo_id"] == emo_name]
         df_emo = df_emo.drop("emo_id", axis=1).reset_index(drop=True)
         _ = mk_mask.make_mask(df_emo, mask_path, task_name)
+
+    #
+    clust_list = glob.glob(f"{work_deriv}/Clust*txt")
+    if clust_list:
+        for clust_file in clust_list:
+            os.remove(clust_file)
 
 
 class ClassRest:
@@ -60,8 +68,16 @@ class ClassRest:
     """
 
     def __init__(
-        self, subj, sess_list, proj_name, mask_name, model_name,
-        task_name, work_deriv, log_dir
+        self,
+        subj,
+        sess_list,
+        proj_name,
+        mask_name,
+        model_name,
+        task_name,
+        con_name,
+        work_deriv,
+        log_dir,
     ):
         """Title."""
         self._subj = subj
@@ -70,6 +86,7 @@ class ClassRest:
         self._mask_name = mask_name
         self._model_name = model_name
         self._task_name = task_name
+        self._con_name = con_name
         self._work_deriv = work_deriv
         self._log_dir = log_dir
         helper.check_proj_sess(proj_name, sess_list)
@@ -115,7 +132,7 @@ class ClassRest:
         self._mask_path = os.path.join(self._work_deriv, self._mask_name)
         map_str = (
             f"weight_model-{self._model_name}_task-{self._task_name}_"
-            + "emo-*_map.nii.gz"
+            + f"con-{self._con_name}_emo-*_map.nii.gz"
         )
         self._weight_maps = sorted(glob.glob(f"{self._work_deriv}/{map_str}"))
         if not self._weight_maps or not os.path.exists(self._mask_path):
@@ -131,7 +148,8 @@ class ClassRest:
             os.makedirs(out_dir)
         out_path = os.path.join(
             out_dir,
-            f"df_dot-product_model-{self._model_name}_task-{self._task_name}.csv"
+            f"df_dot-product_model-{self._model_name}_"
+            + f"con-{self._con_name}_task-{self._task_name}.csv",
         )
         if os.path.exists(out_path):
             return
@@ -141,5 +159,6 @@ class ClassRest:
         do_dot.parallel_dot(self._weight_maps, self._subj, sess, self._log_dir)
         do_dot.label_vol()
         do_dot.df_prod.to_csv(out_path, index=False)
+
 
 # %%
