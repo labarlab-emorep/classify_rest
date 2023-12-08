@@ -3,7 +3,8 @@
 check_ras : check env for RSA key
 check_afni : check env for afni singularity path
 check_proj_sess : check if proj_name, sess list match
-DataSync : Manage data down/uploads
+KeokiPaths : supply addresses and paths for labarserv2, keoki
+DataSync : manage data down/uploads
 
 """
 import os
@@ -32,6 +33,16 @@ def check_afni():
         ) from e
 
 
+def check_sql_pass():
+    """Check if SQL_PASS exists in env."""
+    try:
+        os.environ["SQL_PASS"]
+    except KeyError as e:
+        raise Exception(
+            "No global variable 'SQL_PASS' defined in user env"
+        ) from e
+
+
 def check_proj_sess(proj_name: str, sess_list: list):
     """Check if proj_name, sess_list match."""
     if proj_name not in ["emorep", "archival"]:
@@ -46,7 +57,7 @@ def check_proj_sess(proj_name: str, sess_list: list):
                 raise ValueError(f"Unexpected session for archival : {sess}")
 
 
-class _KeokiPaths:
+class KeokiPaths:
     """Make path properties available."""
 
     def __init__(self, proj_name: str):
@@ -74,7 +85,7 @@ class _KeokiPaths:
         return os.path.join(self.keoki_emorep, mri_dir, "derivatives")
 
 
-class DataSync(_KeokiPaths):
+class DataSync(KeokiPaths):
     """Synchronize data between DCC and Keoki.
 
     Download data from, and upload data to, Keoki using

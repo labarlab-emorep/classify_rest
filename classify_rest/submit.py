@@ -71,7 +71,7 @@ def schedule_setup(
     chk_file = os.path.join(
         work_deriv,
         f"weight_model-{model_name}_task-{task_name}_"
-        + "emo-amusement_map.nii.gz",
+        + f"con-{con_name}_emo-amusement_map.nii.gz",
     )
     if os.path.exists(chk_file):
         return

@@ -6,6 +6,7 @@ Notes
 -----
 RSA_LS2
 SING_AFNI
+SQL_PASS
 
 Examples
 --------
@@ -122,11 +123,12 @@ def main():
     mask_name = args.mask_name
     model_name = args.model_name
     task_name = args.task_name
-    con_name = args.con_name
+    con_name = args.contrast_name
 
     #
     helper.check_ras()
     helper.check_afni()
+    helper.check_sql_pass()
     helper.check_proj_sess(proj_name, sess_list)
 
     #

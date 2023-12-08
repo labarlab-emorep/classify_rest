@@ -11,6 +11,7 @@ import pandas as pd
 from multiprocessing import Process
 from classify_rest import helper
 from classify_rest import process
+from classify_rest import sql_database
 from func_model.resources import fsl
 
 
@@ -152,6 +153,7 @@ class ClassRest:
             + f"con-{self._con_name}_task-{self._task_name}.csv",
         )
         if os.path.exists(out_path):
+            self._update_db(pd.read_csv(out_path))
             return
 
         #
@@ -159,6 +161,20 @@ class ClassRest:
         do_dot.parallel_dot(self._weight_maps, self._subj, sess, self._log_dir)
         do_dot.label_vol()
         do_dot.df_prod.to_csv(out_path, index=False)
+        self._update_db(do_dot.df_prod.copy())
+
+    def _update_db(self, df):
+        """Title."""
+        print("Starting database update")
+        tbl_input = sql_database.df_format(
+            df,
+            self._subj,
+            self._mask_name,
+            self._model_name,
+            self._task_name,
+            self._con_name,
+        )
+        sql_database.db_update(self._proj_name, tbl_input)
 
 
 # %%
