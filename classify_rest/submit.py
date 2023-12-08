@@ -108,15 +108,15 @@ def schedule_setup(
 
 
 def schedule_workflow(
-    subj,
-    sess_list,
-    proj_name,
-    mask_name,
-    model_name,
-    task_name,
-    con_name,
-    work_deriv,
-    log_dir,
+    subj: str,
+    sess_list: list,
+    proj_name: str,
+    mask_name: str,
+    model_name: str,
+    task_name: str,
+    con_name: str,
+    work_deriv: Union[str, os.PathLike],
+    log_dir: Union[str, os.PathLike],
 ):
     """Schedule workflow.ClassRest."""
     sbatch_cmd = f"""\

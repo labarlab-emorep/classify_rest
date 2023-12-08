@@ -1,32 +1,29 @@
-"""Title.
+"""Methods for sending data to mysql database db_emorep.
 
-db_update :
-df_format :
+db_update : update db_emorep
+df_format : convert df values into format for db_update
 
 """
 import os
-import pandas as pd
 import pymysql
 import paramiko
 from sshtunnel import SSHTunnelForwarder
 from classify_rest import helper
 
 
-def _tbl_name(proj_name):
-    """Title."""
+def _tbl_name(proj_name: str) -> str:
+    """Return db_emorep table name."""
     return f"tbl_dotprod_{proj_name}_202312"
 
 
 def db_update(proj_name: str, tbl_input: list):
-    """Title."""
-    #
+    """Update db_emorep table on labarserv2."""
     helper.check_ras()
     helper.check_sql_pass()
     if len(tbl_input[0]) != 22:
         raise ValueError("Unexpected number of values for insert")
 
-    #
-    print("Starting ssh tunnel ...")
+    # Setup ssh tunnel
     dst_ip = helper.KeokiPaths(proj_name).labarserv2_ip
     ras_keoki = paramiko.RSAKey.from_private_key_file(os.environ["RSA_LS2"])
     ssh_tunnel = SSHTunnelForwarder(
@@ -37,10 +34,7 @@ def db_update(proj_name: str, tbl_input: list):
     )
     ssh_tunnel.start()
 
-    #
-    print("Starting db connection ...")
-    print(tbl_input)
-    #
+    # Create connection to mysql db
     db_con = pymysql.connect(
         host="127.0.0.1",
         user=os.environ["USER"],
@@ -48,6 +42,8 @@ def db_update(proj_name: str, tbl_input: list):
         db="db_emorep",
         port=ssh_tunnel.local_bind_port,
     )
+
+    # Update db table
     db_cur = db_con.cursor()
     sql_cmd = (
         f"insert ignore into {_tbl_name(proj_name)} "
@@ -59,22 +55,23 @@ def db_update(proj_name: str, tbl_input: list):
         + "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, "
         + "%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
     )
-    print(sql_cmd)
     db_cur.executemany(sql_cmd, tbl_input)
     db_con.commit()
 
-    #
-    print("Closing ...")
+    # Shutdown
     db_cur.close()
     db_con.close()
     ssh_tunnel.stop()
 
 
 class _KeyMap:
-    """Title."""
+    """Supply mappings for db_emorep foreign keys."""
 
-    def subj_map(self, subj: str) -> int:
-        return int(subj[6:])
+    def subj_map(self, subj: str, proj_name: str) -> int:
+        if proj_name == "emorep":
+            return int(subj[6:])
+        elif proj_name == "archival":
+            return int(subj[4:])
 
     def mask_map(self, mask: str) -> int:
         _map = {"tpl_GM_mask.nii.gz": 1}
@@ -113,26 +110,28 @@ class _KeyMap:
         }
 
     def emo_label(self, row, row_name):
-        """Title."""
+        """Update column values."""
         for emo_name, emo_id in self.emo_map.items():
             if row[row_name] == emo_name:
                 return emo_id
 
 
 def df_format(
-    df, subj, mask_name, model_name, task_name, con_name
-) -> pd.DataFrame:
-    """Title."""
-    print("Formatting df for db_emorep ...")
+    df, subj, proj_name, mask_name, model_name, task_name, con_name
+) -> list:
+    """Make df compliant with db_emorep, return list of tuples."""
+    # Add foreign key columns
     km = _KeyMap()
-    df["subj_id"] = km.subj_map(subj)
+    df["subj_id"] = km.subj_map(subj, proj_name)
     df["task_id"] = km.task_map(task_name)
     df["model_id"] = km.model_map(model_name)
     df["con_id"] = km.con_map(con_name)
     df["mask_id"] = km.mask_map(mask_name)
 
-    #
+    # Replace alpha emo with key value
     df["label_max"] = df.apply(lambda x: km.emo_label(x, "label_max"), axis=1)
+
+    # Generate input for sql command
     cols_ordered = [
         "subj_id",
         "task_id",

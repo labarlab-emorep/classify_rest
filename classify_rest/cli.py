@@ -125,13 +125,13 @@ def main():
     task_name = args.task_name
     con_name = args.contrast_name
 
-    #
+    # Check arguments
     helper.check_ras()
     helper.check_afni()
     helper.check_sql_pass()
     helper.check_proj_sess(proj_name, sess_list)
 
-    #
+    # Setup working, logging dirs
     dir_name = "EmoRep" if proj_name == "emorep" else "Archival"
     work_deriv = os.path.join(
         "/work",
@@ -139,17 +139,16 @@ def main():
         f"{dir_name}/classify_rest",
     )
     now_time = datetime.now()
-    # log_dir = os.path.join(
-    #     os.path.dirname(work_deriv),
-    #     "logs",
-    #     f"classify_rest_{now_time.strftime('%y%m%d_%H%M')}",
-    # )
-    log_dir = os.path.join(os.path.dirname(work_deriv), "logs", "test")
+    log_dir = os.path.join(
+        os.path.dirname(work_deriv),
+        "logs",
+        f"classify_rest_{now_time.strftime('%y%m%d_%H%M')}",
+    )
     for chk_dir in [work_deriv, log_dir]:
         if not os.path.exists(chk_dir):
             os.makedirs(chk_dir)
 
-    #
+    # Download classifier weights and mask
     submit.schedule_setup(
         proj_name,
         work_deriv,
