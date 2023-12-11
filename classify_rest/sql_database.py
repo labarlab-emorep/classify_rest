@@ -18,7 +18,7 @@ def _tbl_name(proj_name: str) -> str:
 
 def db_update(proj_name: str, tbl_input: list):
     """Update db_emorep table on labarserv2."""
-    helper.check_ras()
+    helper.check_rsa()
     helper.check_sql_pass()
     if len(tbl_input[0]) != 22:
         raise ValueError("Unexpected number of values for insert")

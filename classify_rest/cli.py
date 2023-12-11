@@ -1,12 +1,18 @@
-"""Title.
+"""Compute dot product between classifier weights and rest EPI data.
 
-Description.
+Z-score each volume of cleaned resting state EPI data and then
+compute dot product of volume z-score and classifier weight for
+each emotion.
+
+Generates one df_dot-prod_* for each subject session, and updates
+mysql db_emorep.tbl_dotprod_*.
 
 Notes
 -----
-RSA_LS2
-SING_AFNI
-SQL_PASS
+Requires the following global variables in user environment:
+    - RSA_LS2 : location of RSA key to labarserv2
+    - SING_AFNI : location of AFNI singularity image
+    - SQL_PASS : password for mysql db_emorep
 
 Examples
 --------
@@ -126,7 +132,7 @@ def main():
     con_name = args.contrast_name
 
     # Check arguments
-    helper.check_ras()
+    helper.check_rsa()
     helper.check_afni()
     helper.check_sql_pass()
     helper.check_proj_sess(proj_name, sess_list)

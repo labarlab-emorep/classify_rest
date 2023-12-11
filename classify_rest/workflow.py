@@ -182,7 +182,6 @@ class ClassRest:
         print("Done : workflow.ClassRest._mine_res4d", flush=True)
 
         # Upload output and clean
-        return
         self._ds.ul_rest(self._subj)
         self._ds.clean_work(self._subj)
 

@@ -1,6 +1,6 @@
 """Helper methods.
 
-check_ras : check env for RSA key
+check_rsa : check env for RSA key
 check_afni : check env for afni singularity path
 check_proj_sess : check if proj_name, sess list match
 KeokiPaths : supply addresses and paths for labarserv2, keoki
@@ -13,7 +13,7 @@ from typing import Tuple, Union
 from classify_rest import submit
 
 
-def check_ras():
+def check_rsa():
     """Check if RSA_LS2 exists in env."""
     try:
         os.environ["RSA_LS2"]
@@ -108,7 +108,7 @@ class DataSync(KeokiPaths):
 
     def __init__(self, proj_name: str, work_deriv: Union[str, os.PathLike]):
         """Initialize."""
-        check_ras()
+        check_rsa()
         self._work_deriv = work_deriv
         self._user = os.environ["USER"]
         super().__init__(proj_name)

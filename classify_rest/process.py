@@ -1,5 +1,6 @@
 """Methods for processing data.
 
+ZscoreVols : generate individual z-scored NIfTIs for each volume
 DoDot : compute dot product between classifier weight matrix and
         cleaned resting state volumes.
 
@@ -17,7 +18,9 @@ from classify_rest import submit
 
 
 # %%
-def _clean_afni_stdout(in_file, out_file):
+def _clean_afni_stdout(
+    in_file: Union[str, os.PathLike], out_file: Union[str, os.PathLike]
+):
     """Clean in_file of singularity verbiage, write out_file."""
     sing_list = ["Container", "Executing"]
     with open(in_file) as in_f, open(out_file, "w") as out_f:
@@ -27,8 +30,8 @@ def _clean_afni_stdout(in_file, out_file):
     os.remove(in_file)
 
 
-def _read_line(in_file):
-    """Title."""
+def _read_line(in_file: Union[str, os.PathLike]) -> str:
+    """Return line value of in_file and delete in_file."""
     with open(in_file, "r") as in_f:
         line_val = in_f.readline()
     os.remove(in_file)
@@ -37,31 +40,50 @@ def _read_line(in_file):
 
 # %%
 class ZscoreVols:
-    """Title.
+    """Convert each volume of rest EPI to z-scored NIfTI.
+
+    Parameters
+    ----------
+    res_path : str, os.PathLike
+        Location of cleaned resting state EPI
+    mask_path : str, os.PathLike
+        Location of binary mask
+    subj_deriv : str, os.PathLike
+        Output location for subject
 
     Attributes
     ----------
-    res_vols :
+    res_vols : dict
+        {0: "/path/to/tmp_vol-0_zscore.nii.gz"}
+        Volume number and path to file
 
     Methods
     -------
-    zscore_vols
+    zscore_vols()
+        Convert each volume of resting EPI to a
+        z-scored file.
+
+    Example
+    -------
+    zs = ZscoreVols(*args)
+    zs.zscore_vols()
+    file_dict = zs.res_vols
 
     """
 
     def __init__(self, res_path, mask_path, subj_deriv):
-        """Title."""
+        """Initialize."""
         self._res_path = res_path
         self._mask_path = mask_path
         self._subj_deriv = subj_deriv
 
     def _get_nvols(self) -> int:
-        """Title."""
+        """Return number of volumes in NIfTi."""
         img = nib.load(self._res_path)
         return img.header.get_data_shape()[-1]
 
     def zscore_vols(self):
-        """Title."""
+        """Make z-scored file for each volume."""
         self.res_vols = {}
         num_vols = self._get_nvols()
         self._vol = 0
@@ -69,12 +91,13 @@ class ZscoreVols:
             self._zscore()
             self._vol += 1
 
-        #
+        # Check for all expected output
         if len(self.res_vols.keys()) != num_vols:
             raise ValueError("Failure in zscore volume extraction.")
 
     def _zscore(self):
-        """Title."""
+        """Compute z-score for volume."""
+        # Check for previous work
         out_path = os.path.join(
             self._subj_deriv, f"tmp_vol-{self._vol}_zscore.nii.gz"
         )
@@ -82,7 +105,7 @@ class ZscoreVols:
             self.res_vols[self._vol] = out_path
             return
 
-        #
+        # Conduct calculation
         vol_mean = self._mean()
         vol_std = self._std()
         cmd_list = [
@@ -97,8 +120,8 @@ class ZscoreVols:
             raise FileNotFoundError(f"Missing file : {out_path}")
         self.res_vols[self._vol] = out_path
 
-    def _mean(self):
-        """Title."""
+    def _mean(self) -> str:
+        """Compute mean of volume."""
         out_txt = os.path.join(self._subj_deriv, f"tmp_mean_{self._vol}.txt")
         cmd_list = [
             "3dBrickStat",
@@ -108,8 +131,8 @@ class ZscoreVols:
         ]
         return self._submit_read(cmd_list, out_txt)
 
-    def _std(self):
-        """Title."""
+    def _std(self) -> str:
+        """Compute stdev of volume."""
         out_txt = os.path.join(self._subj_deriv, f"tmp_std_{self._vol}.txt")
         cmd_list = [
             "3dBrickStat",
@@ -119,8 +142,8 @@ class ZscoreVols:
         ]
         return self._submit_read(cmd_list, out_txt)
 
-    def _submit_read(self, cmd_list, out_txt):
-        """Title."""
+    def _submit_read(self, cmd_list, out_txt) -> str:
+        """Run bash command and extract AFNI stdout."""
         bash_cmd = " ".join(self._prepend_afni() + cmd_list)
         submit.submit_subprocess(bash_cmd)
         out_csv = out_txt.replace(".txt", ".csv")
@@ -145,7 +168,8 @@ class ZscoreVols:
 class _DotProd:
     """Calculate dot products.
 
-    Writes a tmp_emo*_weight.csv to subject output directory.
+    Writes a tmp_emo*_weight.csv to subject output directory. Wrapped
+    by DoDot.
 
     Methods
     -------
@@ -172,7 +196,8 @@ class _DotProd:
         open(out_txt, "w").close()
 
         # Calc dot product for each volume
-        for _, self._res_path in self._res_vols.items():
+        for vol, self._res_path in self._res_vols.items():
+            print(f"Calculating dot product for volume : {vol}")
             self._calc_dot(weight_path, out_txt)
 
         # Clean txt file of singularity verbiage, write csv
@@ -219,13 +244,13 @@ class DoDot:
 
     Parameters
     ----------
-
-
-
-    res_path : str, os.PathLike
-        Location of cleaned resting state data
+    res_vols : dict, process.ZscoreVols.res_vols
+        {0: "/path/to/tmp_vol-0_zscore.nii.gz"}
+        Volume number and path to file
     mask_path : str, os.PathLike
         Location of binary mask
+    subj_deriv : str, os.PathLike
+        Output location for subject
 
     Attributes
     ----------
