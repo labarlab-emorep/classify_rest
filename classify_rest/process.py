@@ -27,75 +27,28 @@ def _clean_afni_stdout(
         for line in in_f:
             if not any(x in line for x in sing_list):
                 out_f.write(line)
-    os.remove(in_file)
 
 
 def _read_line(in_file: Union[str, os.PathLike]) -> str:
-    """Return line value of in_file and delete in_file."""
+    """Return line value of in_file."""
     with open(in_file, "r") as in_f:
         line_val = in_f.readline()
-    os.remove(in_file)
     return line_val
 
 
 # %%
-class ZscoreVols:
-    """Convert each volume of rest EPI to z-scored NIfTI.
+class _CalcZscore:
+    """Title."""
 
-    Parameters
-    ----------
-    res_path : str, os.PathLike
-        Location of cleaned resting state EPI
-    mask_path : str, os.PathLike
-        Location of binary mask
-    subj_deriv : str, os.PathLike
-        Output location for subject
-
-    Attributes
-    ----------
-    res_vols : dict
-        {0: "/path/to/tmp_vol-0_zscore.nii.gz"}
-        Volume number and path to file
-
-    Methods
-    -------
-    zscore_vols()
-        Convert each volume of resting EPI to a
-        z-scored file.
-
-    Example
-    -------
-    zs = ZscoreVols(*args)
-    zs.zscore_vols()
-    file_dict = zs.res_vols
-
-    """
-
-    def __init__(self, res_path, mask_path, subj_deriv):
-        """Initialize."""
+    def __init__(self, subj_deriv, res_path, mask_path):
+        """Title."""
+        self._subj_deriv = subj_deriv
         self._res_path = res_path
         self._mask_path = mask_path
-        self._subj_deriv = subj_deriv
+        self._vol = int(os.environ["SLURM_ARRAY_TASK_ID"])
+        print(f"Vol number : {self._vol}")
 
-    def _get_nvols(self) -> int:
-        """Return number of volumes in NIfTi."""
-        img = nib.load(self._res_path)
-        return img.header.get_data_shape()[-1]
-
-    def zscore_vols(self):
-        """Make z-scored file for each volume."""
-        self.res_vols = {}
-        num_vols = self._get_nvols()
-        self._vol = 0
-        while self._vol < num_vols:
-            self._zscore()
-            self._vol += 1
-
-        # Check for all expected output
-        if len(self.res_vols.keys()) != num_vols:
-            raise ValueError("Failure in zscore volume extraction.")
-
-    def _zscore(self):
+    def zscore(self):
         """Compute z-score for volume."""
         # Check for previous work
         out_path = os.path.join(
@@ -118,7 +71,7 @@ class ZscoreVols:
         submit.submit_subprocess(bash_cmd)
         if not os.path.exists(out_path):
             raise FileNotFoundError(f"Missing file : {out_path}")
-        self.res_vols[self._vol] = out_path
+        # self.res_vols[self._vol] = out_path
 
     def _mean(self) -> str:
         """Compute mean of volume."""
@@ -165,6 +118,100 @@ class ZscoreVols:
 
 
 # %%
+class ZscoreVols:
+    """Convert each volume of rest EPI to z-scored NIfTI.
+
+    Parameters
+    ----------
+    res_path : str, os.PathLike
+        Location of cleaned resting state EPI
+    mask_path : str, os.PathLike
+        Location of binary mask
+    subj_deriv : str, os.PathLike
+        Output location for subject
+
+
+    log_dir = str, os.PathLike
+
+    Attributes
+    ----------
+    res_vols : dict
+        {0: "/path/to/tmp_vol-0_zscore.nii.gz"}
+        Volume number and path to file
+
+    Methods
+    -------
+    zscore_vols()
+        Convert each volume of resting EPI to a
+        z-scored file.
+
+    Example
+    -------
+    zs = ZscoreVols(*args)
+    zs.zscore_vols()
+    file_dict = zs.res_vols
+
+    """
+
+    def __init__(self, res_path, mask_path, subj_deriv, log_dir):
+        """Initialize."""
+        self._res_path = res_path
+        self._mask_path = mask_path
+        self._subj_deriv = subj_deriv
+        self._log_dir = log_dir
+
+    def _get_nvols(self) -> int:
+        """Return number of volumes in NIfTi."""
+        img = nib.load(self._res_path)
+        return img.header.get_data_shape()[-1]
+
+    def zscore_vols(self):
+        """Make z-scored file for each volume."""
+        # self.res_vols = {}
+        num_vols = self._get_nvols()
+
+        sbatch_cmd = f"""\
+            #!/bin/env {sys.executable}
+
+            #SBATCH --output={self._log_dir}/zs_%A_%a.txt
+            #SBATCH --array=0-{num_vols - 1}%10
+            #SBATCH --wait
+
+            from classify_rest import process
+            cz = process._CalcZscore(
+                "{self._subj_deriv}",
+                "{self._res_path}",
+                "{self._mask_path}",
+            )
+            cz.zscore()
+
+        """
+        sbatch_cmd = textwrap.dedent(sbatch_cmd)
+        py_script = f"{self._log_dir}/run_zscore.py"
+        with open(py_script, "w") as ps:
+            ps.write(sbatch_cmd)
+        _, _ = submit.submit_subprocess(f"sbatch {py_script}")
+        # self._vol = 0
+        # while self._vol < num_vols:
+        #     self._zscore()
+        #     self._vol += 1
+
+        # Build res_vols manually
+        self.res_vols = {}
+        for vol in list(range(0, num_vols)):
+            res_path = os.path.join(
+                self._subj_deriv, f"tmp_vol-{vol}_zscore.nii.gz"
+            )
+            if os.path.exists(res_path):
+                self.res_vols[vol] = res_path
+
+        # Check for all expected output
+        print(self.res_vols)
+        if len(self.res_vols.keys()) != num_vols:
+            raise ValueError(f"Failure in zscore volume extraction.")
+
+
+# %%
 class _DotProd:
     """Calculate dot products.
 
@@ -192,7 +239,9 @@ class _DotProd:
     def run_dot(self, emo_name: str, weight_path: Union[str, os.PathLike]):
         """Calc dot product for all volumes, write to csv."""
         # Set attrs and start empty txt file
-        out_txt = os.path.join(self._subj_deriv, f"tmp_{emo_name}_weight.txt")
+        out_txt = os.path.join(
+            self._subj_deriv, f"tmp_df_{emo_name}_weight.txt"
+        )
         open(out_txt, "w").close()
 
         # Calc dot product for each volume
@@ -343,7 +392,7 @@ class DoDot:
 
     def label_vol(self):
         """Aggregate emotion dataframes and assign volume labels."""
-        csv_list = sorted(glob.glob(f"{self._subj_deriv}/tmp_*csv"))
+        csv_list = sorted(glob.glob(f"{self._subj_deriv}/tmp_df_*csv"))
         if not csv_list:
             raise FileNotFoundError(
                 f"Expected csv files in {self._subj_deriv}"

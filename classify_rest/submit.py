@@ -126,7 +126,7 @@ def schedule_workflow(
         #SBATCH --output={log_dir}/par{subj[4:]}.txt
         #SBATCH --time=02:00:00
         #SBATCH --cpus-per-task=3
-        #SBATCH --mem-per-cpu=3G
+        #SBATCH --mem=8G
 
         from classify_rest import workflow
 

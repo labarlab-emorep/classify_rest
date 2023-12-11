@@ -182,6 +182,7 @@ class ClassRest:
         print("Done : workflow.ClassRest._mine_res4d", flush=True)
 
         # Upload output and clean
+        return
         self._ds.ul_rest(self._subj)
         self._ds.clean_work(self._subj)
 
@@ -227,7 +228,7 @@ class ClassRest:
 
         # Convert volume values to zscore and split
         z_split = process.ZscoreVols(
-            res_path, self._mask_path, os.path.dirname(res_path)
+            res_path, self._mask_path, os.path.dirname(res_path), self._log_dir
         )
         z_split.zscore_vols()
 
