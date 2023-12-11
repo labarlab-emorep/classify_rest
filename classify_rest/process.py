@@ -17,6 +17,131 @@ from classify_rest import submit
 
 
 # %%
+def _clean_afni_stdout(in_file, out_file):
+    """Clean in_file of singularity verbiage, write out_file."""
+    sing_list = ["Container", "Executing"]
+    with open(in_file) as in_f, open(out_file, "w") as out_f:
+        for line in in_f:
+            if not any(x in line for x in sing_list):
+                out_f.write(line)
+    os.remove(in_file)
+
+
+def _read_line(in_file):
+    """Title."""
+    with open(in_file, "r") as in_f:
+        line_val = in_f.readline()
+    os.remove(in_file)
+    return line_val
+
+
+# %%
+class ZscoreVols:
+    """Title.
+
+    Attributes
+    ----------
+    res_vols :
+
+    Methods
+    -------
+    zscore_vols
+
+    """
+
+    def __init__(self, res_path, mask_path, subj_deriv):
+        """Title."""
+        self._res_path = res_path
+        self._mask_path = mask_path
+        self._subj_deriv = subj_deriv
+
+    def _get_nvols(self) -> int:
+        """Title."""
+        img = nib.load(self._res_path)
+        return img.header.get_data_shape()[-1]
+
+    def zscore_vols(self):
+        """Title."""
+        self.res_vols = {}
+        num_vols = self._get_nvols()
+        self._vol = 0
+        while self._vol < num_vols:
+            self._zscore()
+            self._vol += 1
+
+        #
+        if len(self.res_vols.keys()) != num_vols:
+            raise ValueError("Failure in zscore volume extraction.")
+
+    def _zscore(self):
+        """Title."""
+        out_path = os.path.join(
+            self._subj_deriv, f"tmp_vol-{self._vol}_zscore.nii.gz"
+        )
+        if os.path.exists(out_path):
+            self.res_vols[self._vol] = out_path
+            return
+
+        #
+        vol_mean = self._mean()
+        vol_std = self._std()
+        cmd_list = [
+            "3dcalc",
+            f"-a '{self._res_path}[{self._vol}]'",
+            f"-expr '(a-{vol_mean})/{vol_std}'",
+            f"-prefix {out_path}",
+        ]
+        bash_cmd = " ".join(self._prepend_afni() + cmd_list)
+        submit.submit_subprocess(bash_cmd)
+        if not os.path.exists(out_path):
+            raise FileNotFoundError(f"Missing file : {out_path}")
+        self.res_vols[self._vol] = out_path
+
+    def _mean(self):
+        """Title."""
+        out_txt = os.path.join(self._subj_deriv, f"tmp_mean_{self._vol}.txt")
+        cmd_list = [
+            "3dBrickStat",
+            f"-mask {self._mask_path}",
+            f"-mean '{self._res_path}[{self._vol}]'",
+            f"> {out_txt}",
+        ]
+        return self._submit_read(cmd_list, out_txt)
+
+    def _std(self):
+        """Title."""
+        out_txt = os.path.join(self._subj_deriv, f"tmp_std_{self._vol}.txt")
+        cmd_list = [
+            "3dBrickStat",
+            f"-mask {self._mask_path}",
+            f"-stdev '{self._res_path}[{self._vol}]'",
+            f"> {out_txt}",
+        ]
+        return self._submit_read(cmd_list, out_txt)
+
+    def _submit_read(self, cmd_list, out_txt):
+        """Title."""
+        bash_cmd = " ".join(self._prepend_afni() + cmd_list)
+        submit.submit_subprocess(bash_cmd)
+        out_csv = out_txt.replace(".txt", ".csv")
+        _clean_afni_stdout(out_txt, out_csv)
+        return _read_line(out_csv)
+
+    def _prepend_afni(self) -> list:
+        """Return singularity call setup."""
+        par_dir = os.path.dirname(self._mask_path)
+        return [
+            "singularity",
+            "run",
+            "--cleanenv",
+            f"--bind {par_dir}:{par_dir}",
+            f"--bind {self._subj_deriv}:{self._subj_deriv}",
+            f"--bind {self._subj_deriv}:/opt/home",
+            os.environ["SING_AFNI"],
+        ]
+
+
+# %%
 class _DotProd:
     """Calculate dot products.
 
@@ -31,64 +156,50 @@ class _DotProd:
 
     def __init__(
         self,
-        res_path: Union[str, os.PathLike],
+        res_vols: dict,
         mask_path: Union[str, os.PathLike],
-        num_vol: int,
         subj_deriv: Union[str, os.PathLike],
     ):
         """Initialize."""
-        self._res_path = res_path
+        self._res_vols = res_vols
         self._mask_path = mask_path
-        self._num_vol = num_vol
         self._subj_deriv = subj_deriv
 
     def run_dot(self, emo_name: str, weight_path: Union[str, os.PathLike]):
         """Calc dot product for all volumes, write to csv."""
         # Set attrs and start empty txt file
-        self._weight_path = weight_path
-        self._out_txt = os.path.join(
-            self._subj_deriv, f"tmp_{emo_name}_weight.txt"
-        )
-        open(self._out_txt, "w").close()
+        out_txt = os.path.join(self._subj_deriv, f"tmp_{emo_name}_weight.txt")
+        open(out_txt, "w").close()
 
         # Calc dot product for each volume
-        self._vol = 0
-        while self._vol < self._num_vol:
-            self._calc_dot()
-            self._vol += 1
+        for _, self._res_path in self._res_vols.items():
+            self._calc_dot(weight_path, out_txt)
 
         # Clean txt file of singularity verbiage, write csv
-        out_csv = os.path.join(self._subj_deriv, f"tmp_{emo_name}_weight.csv")
-        sing_list = ["Container", "Executing"]
-        with open(self._out_txt) as tf, open(out_csv, "w") as cf:
-            for line in tf:
-                if not any(x in line for x in sing_list):
-                    cf.write(line)
-        os.remove(self._out_txt)
+        out_csv = out_txt.replace(".txt", ".csv")
+        _clean_afni_stdout(out_txt, out_csv)
 
-    def _calc_dot(self):
+    def _calc_dot(self, weight_path, out_txt):
         """Submit dot product calculation."""
         dot_list = [
             "3ddot",
             f"-mask {self._mask_path}",
             "-dodot",
-            f"'{self._res_path}[{self._vol}]'",
-            self._weight_path,
-            f">> {self._out_txt}",
+            self._res_path,
+            weight_path,
+            f">> {out_txt}",
         ]
         bash_cmd = " ".join(self._prepend_afni() + dot_list)
         submit.submit_subprocess(bash_cmd)
 
     def _prepend_afni(self) -> list:
         """Return singularity call setup."""
-        mask_dir = os.path.dirname(self._mask_path)
-        weight_dir = os.path.dirname(self._weight_path)
+        par_dir = os.path.dirname(self._mask_path)
         return [
             "singularity",
             "run",
             "--cleanenv",
-            f"--bind {mask_dir}:{mask_dir}",
-            f"--bind {weight_dir}:{weight_dir}",
+            f"--bind {par_dir}:{par_dir}",
             f"--bind {self._subj_deriv}:{self._subj_deriv}",
             f"--bind {self._subj_deriv}:/opt/home",
             os.environ["SING_AFNI"],
@@ -108,6 +219,9 @@ class DoDot:
 
     Parameters
     ----------
+
+
+
     res_path : str, os.PathLike
         Location of cleaned resting state data
     mask_path : str, os.PathLike
@@ -134,18 +248,12 @@ class DoDot:
 
     """
 
-    def __init__(self, res_path, mask_path):
+    def __init__(self, res_vols, subj_deriv, mask_path):
         """Initialize."""
         helper.check_afni()
-        self._res_path = res_path
+        self._res_vols = res_vols
         self._mask_path = mask_path
-        self._subj_deriv = os.path.dirname(res_path)
-        self._num_vol = self._get_nvols()
-
-    def _get_nvols(self) -> int:
-        """Title."""
-        img = nib.load(self._res_path)
-        return img.header.get_data_shape()[-1]
+        self._subj_deriv = subj_deriv
 
     def parallel_dot(
         self,
@@ -195,9 +303,8 @@ class DoDot:
 
             from classify_rest import process
             dp = process._DotProd(
-                "{self._res_path}",
+                {self._res_vols},
                 "{self._mask_path}",
-                {self._num_vol},
                 "{self._subj_deriv}",
             )
             dp.run_dot("{emo_name}", "{weight_path}")
@@ -219,7 +326,7 @@ class DoDot:
 
         # Aggregate emotion dataframes
         self.df_prod = pd.DataFrame(
-            data={"volume": list(range(1, self._num_vol + 1))}
+            data={"volume": list(range(1, len(self._res_vols.keys()) + 1))}
         )
         for csv_path in csv_list:
             _, emo_name, _ = os.path.basename(csv_path).split("_")

@@ -182,6 +182,7 @@ class ClassRest:
         print("Done : workflow.ClassRest._mine_res4d", flush=True)
 
         # Upload output and clean
+        return
         self._ds.ul_rest(self._subj)
         self._ds.clean_work(self._subj)
 
@@ -225,8 +226,14 @@ class ClassRest:
             self._update_db(pd.read_csv(out_path))
             return
 
+        # Convert volume values to zscore and split
+        z_split = process.ZscoreVols(
+            res_path, self._mask_path, os.path.dirname(res_path)
+        )
+        z_split.zscore_vols()
+
         # Conduct dot product calculations and volume label
-        do_dot = process.DoDot(res_path, self._mask_path)
+        do_dot = process.DoDot(z_split.res_vols, out_dir, self._mask_path)
         do_dot.parallel_dot(self._weight_maps, self._subj, sess, self._log_dir)
         do_dot.label_vol()
         do_dot.df_prod.to_csv(out_path, index=False)
