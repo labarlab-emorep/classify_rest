@@ -196,8 +196,8 @@ class ClassRest:
         self._update_db(do_dot.df_prod.copy())
 
         # Upload output and clean
-        self._ds.ul_rest(self._subj)
-        self._ds.clean_work(self._subj)
+        self._ds.ul_rest(self._subj, self._sess)
+        self._ds.clean_work(self._subj, self._sess)
 
     def _setup(self):
         """Download and check for required files."""

@@ -212,14 +212,13 @@ class DataSync(KeokiPaths):
             f"stats/{self._rs_name}",
         )
 
-    def ul_rest(self, subj: str):
+    def ul_rest(self, subj: str, sess: str):
         """Clean intermediates and upload relevant files to Keoki."""
-        src = os.path.join(self._work_deriv, subj)
+        src = os.path.join(self._work_deriv, subj, sess)
         self._clean_subj(src)
-        dst = (
-            f"{self._user}@{self.labarserv2_ip}:"
-            + f"{self.keoki_deriv}/classify_rest"
-        )
+        dst_path = f"{self.keoki_deriv}/classify_rest/{subj}"
+        dst = f"{self._user}@{self.labarserv2_ip}:{dst_path}"
+        self._make_dst(dst_path)
         _, _ = self._submit_rsync(src, dst)
 
     def _clean_subj(self, sub_dir: Union[str, os.PathLike]):
@@ -232,7 +231,17 @@ class DataSync(KeokiPaths):
             if "df_dot-product" not in file_path:
                 os.remove(file_path)
 
-    def clean_work(self, subj: str):
+    def _make_dst(self, dst: Union[str, os.PathLike]):
+        """Make output destination on Keoki."""
+        make_dst = f"""\
+            ssh \
+                -i {os.environ["RSA_LS2"]} \
+                {self._user}@{self.labarserv2_ip} \
+                " command ; bash -c 'mkdir -p {dst}'"
+        """
+        _, _ = submit.submit_subprocess(make_dst)
+
+    def clean_work(self, subj: str, sess: str):
         """Remove file tree."""
-        rm_path = os.path.join(self._work_deriv, subj)
+        rm_path = os.path.join(self._work_deriv, subj, sess)
         _, _ = submit.submit_subprocess(f"rm -r {rm_path}")
