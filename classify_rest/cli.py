@@ -9,10 +9,13 @@ mysql db_emorep.tbl_dotprod_*.
 
 Notes
 -----
-Requires the following global variables in user environment:
+- Requires the following global variables in user environment:
     - RSA_LS2 : location of RSA key to labarserv2
     - SING_AFNI : location of AFNI singularity image
     - SQL_PASS : password for mysql db_emorep
+- Options contrast-name, model-name, and task-name are used
+    to idenfity the classifier (and reflect which data the
+    classifier was trained on).
 
 Examples
 --------
@@ -44,7 +47,7 @@ def _get_args():
         default="stim",
         help=textwrap.dedent(
             """\
-            Contrast name
+            Contrast name of classifier
             (default : %(default)s)
             """
         ),
@@ -66,7 +69,7 @@ def _get_args():
         default="sep",
         help=textwrap.dedent(
             """\
-            FSL model name
+            FSL model name of classifier
             (default : %(default)s)
             """
         ),
@@ -77,7 +80,7 @@ def _get_args():
         default="movies",
         help=textwrap.dedent(
             """\
-            Task name
+            Task name of classifier
             (default : %(default)s)
             """
         ),
@@ -155,7 +158,7 @@ def main():
             os.makedirs(chk_dir)
 
     # Download classifier weights and mask
-    submit.schedule_setup(
+    submit.sched_setup(
         proj_name,
         work_deriv,
         mask_name,
@@ -165,20 +168,21 @@ def main():
         log_dir,
     )
 
-    #
+    # Conduct workflow for each subject, session
     print("Submitting workflow ...")
     for subj in subj_list:
-        submit.schedule_workflow(
-            subj,
-            sess_list,
-            proj_name,
-            mask_name,
-            model_name,
-            task_name,
-            con_name,
-            work_deriv,
-            log_dir,
-        )
+        for sess in sess_list:
+            submit.sched_workflow(
+                subj,
+                sess,
+                proj_name,
+                mask_name,
+                model_name,
+                task_name,
+                con_name,
+                work_deriv,
+                log_dir,
+            )
 
 
 if __name__ == "__main__":
