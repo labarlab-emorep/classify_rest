@@ -21,7 +21,7 @@ def db_update(proj_name: str, tbl_input: list):
     """Update db_emorep table on labarserv2."""
     helper.check_rsa()
     helper.check_sql_pass()
-    if len(tbl_input[0]) != 22:
+    if len(tbl_input[0]) != 23:
         raise ValueError("Unexpected number of values for insert")
 
     # Setup ssh tunnel
@@ -48,13 +48,13 @@ def db_update(proj_name: str, tbl_input: list):
     db_cur = db_con.cursor()
     sql_cmd = (
         f"insert ignore into {_tbl_name(proj_name)} "
-        + "(subj_id, task_id, model_id, con_id, mask_id, volume, "
+        + "(subj_id, sess_id, task_id, model_id, con_id, mask_id, volume, "
         + "emo_amusement, emo_anger, emo_anxiety, emo_awe, emo_calmness, "
         + "emo_craving, emo_disgust, emo_excitement, emo_fear, emo_horror, "
         + "emo_joy, emo_neutral, emo_romance, emo_sadness, emo_surprise, "
         + "label_max) "
         + "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, "
-        + "%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+        + "%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
     )
     db_cur.executemany(sql_cmd, tbl_input)
     db_con.commit()
@@ -73,6 +73,12 @@ class _KeyMap:
             return int(subj[6:])
         elif proj_name == "archival":
             return int(subj[4:])
+
+    def sess_map(self, sess: str) -> int:
+        if sess == "ses-BAS1":
+            return 4
+        else:
+            return int(sess[-1])
 
     def mask_map(self, mask: str) -> int:
         _map = {"tpl_GM_mask.nii.gz": 1}
@@ -120,6 +126,7 @@ class _KeyMap:
 def df_format(
     df: pd.DataFrame,
     subj: str,
+    sess: str,
     proj_name: str,
     mask_name: str,
     model_name: str,
@@ -130,6 +137,7 @@ def df_format(
     # Add foreign key columns
     km = _KeyMap()
     df["subj_id"] = km.subj_map(subj, proj_name)
+    df["sess_id"] = km.sess_map(sess)
     df["task_id"] = km.task_map(task_name)
     df["model_id"] = km.model_map(model_name)
     df["con_id"] = km.con_map(con_name)
@@ -141,6 +149,7 @@ def df_format(
     # Generate input for sql command
     cols_ordered = [
         "subj_id",
+        "sess_id",
         "task_id",
         "model_id",
         "con_id",

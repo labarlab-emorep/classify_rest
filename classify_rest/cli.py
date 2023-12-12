@@ -9,10 +9,13 @@ mysql db_emorep.tbl_dotprod_*.
 
 Notes
 -----
-Requires the following global variables in user environment:
+- Requires the following global variables in user environment:
     - RSA_LS2 : location of RSA key to labarserv2
     - SING_AFNI : location of AFNI singularity image
     - SQL_PASS : password for mysql db_emorep
+- Options contrast-name, model-name, and task-name are used
+    to idenfity the classifier (and reflect which data the
+    classifier was trained on).
 
 Examples
 --------
@@ -44,7 +47,7 @@ def _get_args():
         default="stim",
         help=textwrap.dedent(
             """\
-            Contrast name
+            Contrast name of classifier
             (default : %(default)s)
             """
         ),
@@ -66,7 +69,7 @@ def _get_args():
         default="sep",
         help=textwrap.dedent(
             """\
-            FSL model name
+            FSL model name of classifier
             (default : %(default)s)
             """
         ),
@@ -77,7 +80,7 @@ def _get_args():
         default="movies",
         help=textwrap.dedent(
             """\
-            Task name
+            Task name of classifier
             (default : %(default)s)
             """
         ),

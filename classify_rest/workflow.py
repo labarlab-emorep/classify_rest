@@ -196,7 +196,6 @@ class ClassRest:
         self._update_db(do_dot.df_prod.copy())
 
         # Upload output and clean
-        return
         self._ds.ul_rest(self._subj)
         self._ds.clean_work(self._subj)
 
@@ -227,6 +226,7 @@ class ClassRest:
         tbl_input = sql_database.df_format(
             df,
             self._subj,
+            self._sess,
             self._proj_name,
             self._mask_name,
             self._model_name,
