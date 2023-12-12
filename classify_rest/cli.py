@@ -155,7 +155,7 @@ def main():
             os.makedirs(chk_dir)
 
     # Download classifier weights and mask
-    submit.schedule_setup(
+    submit.sched_setup(
         proj_name,
         work_deriv,
         mask_name,
@@ -165,20 +165,21 @@ def main():
         log_dir,
     )
 
-    #
+    # Conduct workflow for each subject, session
     print("Submitting workflow ...")
     for subj in subj_list:
-        submit.schedule_workflow(
-            subj,
-            sess_list,
-            proj_name,
-            mask_name,
-            model_name,
-            task_name,
-            con_name,
-            work_deriv,
-            log_dir,
-        )
+        for sess in sess_list:
+            submit.sched_workflow(
+                subj,
+                sess,
+                proj_name,
+                mask_name,
+                model_name,
+                task_name,
+                con_name,
+                work_deriv,
+                log_dir,
+            )
 
 
 if __name__ == "__main__":

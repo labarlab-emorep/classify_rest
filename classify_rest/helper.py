@@ -2,6 +2,7 @@
 
 check_rsa : check env for RSA key
 check_afni : check env for afni singularity path
+chk_sql_pass : check env for mysql password
 check_proj_sess : check if proj_name, sess list match
 KeokiPaths : supply addresses and paths for labarserv2, keoki
 DataSync : manage data down/uploads

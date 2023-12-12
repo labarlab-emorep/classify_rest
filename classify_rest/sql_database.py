@@ -5,6 +5,7 @@ df_format : convert df values into format for db_update
 
 """
 import os
+import pandas as pd
 import pymysql
 import paramiko
 from sshtunnel import SSHTunnelForwarder
@@ -117,7 +118,13 @@ class _KeyMap:
 
 
 def df_format(
-    df, subj, proj_name, mask_name, model_name, task_name, con_name
+    df: pd.DataFrame,
+    subj: str,
+    proj_name: str,
+    mask_name: str,
+    model_name: str,
+    task_name: str,
+    con_name: str,
 ) -> list:
     """Make df compliant with db_emorep, return list of tuples."""
     # Add foreign key columns

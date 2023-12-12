@@ -1,14 +1,12 @@
 """Methods for processing data.
 
-ZscoreVols : generate individual z-scored NIfTIs for each volume
+zscore_vols : generate individual z-scored NIfTIs for each volume
 DoDot : compute dot product between classifier weight matrix and
         cleaned resting state volumes.
 
 """
 import os
-import sys
 import glob
-import textwrap
 from typing import Union
 from multiprocessing import Process
 import pandas as pd
@@ -38,15 +36,28 @@ def _read_line(in_file: Union[str, os.PathLike]) -> str:
 
 # %%
 class _CalcZscore:
-    """Title."""
+    """Calculate and generate z-scored NIfTI for single volume.
 
-    def __init__(self, subj_deriv, res_path, mask_path):
-        """Title."""
+    Wrapped (indirectly via submit.sched_zscore) by zscore_vols.
+
+    Methods
+    -------
+    zscore()
+        Conduct calculation and file generation
+
+    """
+
+    def __init__(
+        self,
+        subj_deriv: Union[str, os.PathLike],
+        res_path: Union[str, os.PathLike],
+        mask_path: Union[str, os.PathLike],
+    ):
+        """Initialize."""
         self._subj_deriv = subj_deriv
         self._res_path = res_path
         self._mask_path = mask_path
         self._vol = int(os.environ["SLURM_ARRAY_TASK_ID"])
-        print(f"Vol number : {self._vol}")
 
     def zscore(self):
         """Compute z-score for volume."""
@@ -55,7 +66,6 @@ class _CalcZscore:
             self._subj_deriv, f"tmp_vol-{self._vol}_zscore.nii.gz"
         )
         if os.path.exists(out_path):
-            self.res_vols[self._vol] = out_path
             return
 
         # Conduct calculation
@@ -71,7 +81,6 @@ class _CalcZscore:
         submit.submit_subprocess(bash_cmd)
         if not os.path.exists(out_path):
             raise FileNotFoundError(f"Missing file : {out_path}")
-        # self.res_vols[self._vol] = out_path
 
     def _mean(self) -> str:
         """Compute mean of volume."""
@@ -118,7 +127,7 @@ class _CalcZscore:
 
 
 # %%
-class ZscoreVols:
+def zscore_vols(res_path, mask_path, subj_deriv, log_dir):
     """Convert each volume of rest EPI to z-scored NIfTI.
 
     Parameters
@@ -129,155 +138,86 @@ class ZscoreVols:
         Location of binary mask
     subj_deriv : str, os.PathLike
         Output location for subject
+    log_dir : str, os.PathLike
+        Output location for logs
 
-
-    log_dir = str, os.PathLike
-
-    Attributes
-    ----------
-    res_vols : dict
+    Returns
+    -------
+    dict
         {0: "/path/to/tmp_vol-0_zscore.nii.gz"}
         Volume number and path to file
 
-    Methods
-    -------
-    zscore_vols()
-        Convert each volume of resting EPI to a
-        z-scored file.
-
-    Example
-    -------
-    zs = ZscoreVols(*args)
-    zs.zscore_vols()
-    file_dict = zs.res_vols
-
     """
+    # Conduct z-scoring of volumes
+    img = nib.load(res_path)
+    num_vols = img.header.get_data_shape()[-1]
+    submit.sched_zscore(
+        num_vols,
+        res_path,
+        subj_deriv,
+        mask_path,
+        log_dir,
+    )
 
-    def __init__(self, res_path, mask_path, subj_deriv, log_dir):
-        """Initialize."""
-        self._res_path = res_path
-        self._mask_path = mask_path
-        self._subj_deriv = subj_deriv
-        self._log_dir = log_dir
+    # Build out dict manually to ensure order
+    res_vols = {}
+    for vol in list(range(0, num_vols)):
+        res_path = os.path.join(subj_deriv, f"tmp_vol-{vol}_zscore.nii.gz")
+        if os.path.exists(res_path):
+            res_vols[vol] = res_path
 
-    def _get_nvols(self) -> int:
-        """Return number of volumes in NIfTi."""
-        img = nib.load(self._res_path)
-        return img.header.get_data_shape()[-1]
-
-    def zscore_vols(self):
-        """Make z-scored file for each volume."""
-        # self.res_vols = {}
-        num_vols = self._get_nvols()
-
-        sbatch_cmd = f"""\
-            #!/bin/env {sys.executable}
-
-            #SBATCH --output={self._log_dir}/zs_%A_%a.txt
-            #SBATCH --array=0-{num_vols - 1}%10
-            #SBATCH --wait
-
-            from classify_rest import process
-            cz = process._CalcZscore(
-                "{self._subj_deriv}",
-                "{self._res_path}",
-                "{self._mask_path}",
-            )
-            cz.zscore()
-
-        """
-        sbatch_cmd = textwrap.dedent(sbatch_cmd)
-        py_script = f"{self._log_dir}/run_zscore.py"
-        with open(py_script, "w") as ps:
-            ps.write(sbatch_cmd)
-        _, _ = submit.submit_subprocess(f"sbatch {py_script}")
-        # self._vol = 0
-        # while self._vol < num_vols:
-        #     self._zscore()
-        #     self._vol += 1
-
-        # Build res_vols manually
-        self.res_vols = {}
-        for vol in list(range(0, num_vols)):
-            res_path = os.path.join(
-                self._subj_deriv, f"tmp_vol-{vol}_zscore.nii.gz"
-            )
-            if os.path.exists(res_path):
-                self.res_vols[vol] = res_path
-
-        # Check for all expected output
-        print(self.res_vols)
-        if len(self.res_vols.keys()) != num_vols:
-            raise ValueError(f"Failure in zscore volume extraction.")
+    # Check for all expected output
+    if len(res_vols.keys()) != num_vols:
+        raise ValueError("Failure in zscore volume extraction.")
+    return res_vols
 
 
 # %%
-class _DotProd:
+def _calc_dot(
+    res_vols: dict,
+    emo_name: str,
+    weight_path: Union[str, os.PathLike],
+    mask_path: Union[str, os.PathLike],
+    subj_deriv: Union[str, os.PathLike],
+):
     """Calculate dot products.
 
     Writes a tmp_emo*_weight.csv to subject output directory. Wrapped
-    by DoDot.
-
-    Methods
-    -------
-    run_dot(*args)
-        Calculate dot products for all volumes
+    (indirectly via submit.sched_dotprod) by DoDot.
 
     """
+    # Start empty output file
+    out_txt = os.path.join(subj_deriv, f"tmp_df_{emo_name}_weight.txt")
+    open(out_txt, "w").close()
 
-    def __init__(
-        self,
-        res_vols: dict,
-        mask_path: Union[str, os.PathLike],
-        subj_deriv: Union[str, os.PathLike],
-    ):
-        """Initialize."""
-        self._res_vols = res_vols
-        self._mask_path = mask_path
-        self._subj_deriv = subj_deriv
-
-    def run_dot(self, emo_name: str, weight_path: Union[str, os.PathLike]):
-        """Calc dot product for all volumes, write to csv."""
-        # Set attrs and start empty txt file
-        out_txt = os.path.join(
-            self._subj_deriv, f"tmp_df_{emo_name}_weight.txt"
-        )
-        open(out_txt, "w").close()
-
-        # Calc dot product for each volume
-        for vol, self._res_path in self._res_vols.items():
-            print(f"Calculating dot product for volume : {vol}")
-            self._calc_dot(weight_path, out_txt)
-
-        # Clean txt file of singularity verbiage, write csv
-        out_csv = out_txt.replace(".txt", ".csv")
-        _clean_afni_stdout(out_txt, out_csv)
-
-    def _calc_dot(self, weight_path, out_txt):
-        """Submit dot product calculation."""
-        dot_list = [
-            "3ddot",
-            f"-mask {self._mask_path}",
-            "-dodot",
-            self._res_path,
-            weight_path,
-            f">> {out_txt}",
-        ]
-        bash_cmd = " ".join(self._prepend_afni() + dot_list)
-        submit.submit_subprocess(bash_cmd)
-
-    def _prepend_afni(self) -> list:
+    def _prepend_afni() -> list:
         """Return singularity call setup."""
-        par_dir = os.path.dirname(self._mask_path)
+        par_dir = os.path.dirname(mask_path)
         return [
             "singularity",
             "run",
             "--cleanenv",
             f"--bind {par_dir}:{par_dir}",
-            f"--bind {self._subj_deriv}:{self._subj_deriv}",
-            f"--bind {self._subj_deriv}:/opt/home",
+            f"--bind {subj_deriv}:{subj_deriv}",
+            f"--bind {subj_deriv}:/opt/home",
             os.environ["SING_AFNI"],
         ]
+
+    # Calc dot product for each volume
+    for vol, res_path in res_vols.items():
+        print(f"Calculating dot product for volume : {vol}")
+        dot_list = [
+            "3ddot",
+            f"-mask {mask_path}",
+            f"-dodot {res_path} {weight_path}",
+            f">> {out_txt}",
+        ]
+        bash_cmd = " ".join(_prepend_afni() + dot_list)
+        submit.submit_subprocess(bash_cmd)
+
+    # Clean txt file of singularity verbiage, write csv
+    out_csv = out_txt.replace(".txt", ".csv")
+    _clean_afni_stdout(out_txt, out_csv)
 
 
 # %%
@@ -293,7 +233,7 @@ class DoDot:
 
     Parameters
     ----------
-    res_vols : dict, process.ZscoreVols.res_vols
+    res_vols : dict, process.zscore_vols
         {0: "/path/to/tmp_vol-0_zscore.nii.gz"}
         Volume number and path to file
     mask_path : str, os.PathLike
@@ -308,15 +248,16 @@ class DoDot:
 
     Methods
     -------
-    parallel_dot()
-        Parallelize the dot product calculations
+    calc_dot()
+        Calculate the dot products of each volume by emotion,
+        in parallel
     label_vol()
         Assign label for each volume from dot product ouput
 
     Example
     -------
     dd = process.DoDot(*args)
-    dd.parallel_dot(*args)
+    dd.calc_dot(*args)
     dd.label_vol()
     df = dd.df_prod
 
@@ -329,7 +270,7 @@ class DoDot:
         self._mask_path = mask_path
         self._subj_deriv = subj_deriv
 
-    def parallel_dot(
+    def calc_dot(
         self,
         weight_maps: list,
         subj: str,
@@ -345,13 +286,17 @@ class DoDot:
             """Return emotion name."""
             return os.path.basename(weight_path).split("emo-")[1].split("_")[0]
 
-        # Run sessions in parallel
+        # Run emotions in parallel
         mult_proc = [
             Process(
-                target=self._sbatch_dot,
+                target=submit.sched_dotprod,
                 args=(
+                    self._res_vols,
                     _emo_name(weight_path),
+                    self._mask_path,
                     weight_path,
+                    self._subj_deriv,
+                    self._log_dir,
                 ),
             )
             for weight_path in weight_maps
@@ -361,34 +306,6 @@ class DoDot:
         for proc in mult_proc:
             proc.join()
         print("Done : process.DoDot.parallel_dot", flush=True)
-
-    def _sbatch_dot(self, emo_name: str, weight_path: Union[str, os.PathLike]):
-        """Submit sbatch job for dot product calculation."""
-        job_name = f"dot_{self._subj[4:]}_{self._sess[4:]}_{emo_name}"
-        sbatch_cmd = f"""\
-            #!/bin/env {sys.executable}
-
-            #SBATCH --job-name={job_name}
-            #SBATCH --output={self._log_dir}/{job_name}.txt
-            #SBATCH --time=00:30:00
-            #SBATCH --cpus-per-task=1
-            #SBATCH --mem-per-cpu=3G
-            #SBATCH --wait
-
-            from classify_rest import process
-            dp = process._DotProd(
-                {self._res_vols},
-                "{self._mask_path}",
-                "{self._subj_deriv}",
-            )
-            dp.run_dot("{emo_name}", "{weight_path}")
-
-        """
-        sbatch_cmd = textwrap.dedent(sbatch_cmd)
-        py_script = f"{self._log_dir}/run_{job_name}.py"
-        with open(py_script, "w") as ps:
-            ps.write(sbatch_cmd)
-        _, _ = submit.submit_subprocess(f"sbatch {py_script}")
 
     def label_vol(self):
         """Aggregate emotion dataframes and assign volume labels."""
@@ -403,7 +320,7 @@ class DoDot:
             data={"volume": list(range(1, len(self._res_vols.keys()) + 1))}
         )
         for csv_path in csv_list:
-            _, emo_name, _ = os.path.basename(csv_path).split("_")
+            _tmp, _df, emo_name, _suff = os.path.basename(csv_path).split("_")
             df = pd.read_csv(csv_path, header=None, names=[f"emo_{emo_name}"])
             df.index += 1
             df = df.reset_index().rename(columns={"index": "volume"})

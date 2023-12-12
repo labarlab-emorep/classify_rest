@@ -8,8 +8,6 @@ ClassRest : compute dot product for each volume x emotion
 import os
 import glob
 import pandas as pd
-from typing import Union
-from multiprocessing import Process
 from classify_rest import helper
 from classify_rest import process
 from classify_rest import sql_database
@@ -101,7 +99,7 @@ class ClassRest:
     ----------
     subj : str
         BIDS subject identifier
-    sess_list : list
+    sess : str
         {"ses-day2", "ses-day3", "ses-BAS1"}
         BIDS session identifier
     proj_name : str
@@ -136,7 +134,7 @@ class ClassRest:
     def __init__(
         self,
         subj,
-        sess_list,
+        sess,
         proj_name,
         mask_name,
         model_name,
@@ -147,7 +145,7 @@ class ClassRest:
     ):
         """Initialize."""
         self._subj = subj
-        self._sess_list = sess_list
+        self._sess = sess
         self._proj_name = proj_name
         self._mask_name = mask_name
         self._model_name = model_name
@@ -157,29 +155,45 @@ class ClassRest:
         self._log_dir = log_dir
 
         # Check options and get data sync object
-        helper.check_proj_sess(proj_name, sess_list)
+        helper.check_proj_sess(proj_name, [sess])
         self._ds = helper.DataSync(self._proj_name, self._work_deriv)
 
     def label_vols(self):
         """Compute dot product and label each volume."""
+        # Run setup
+        out_dir = os.path.join(
+            self._work_deriv, self._subj, self._sess, "func"
+        )
+        if not os.path.exists(out_dir):
+            os.makedirs(out_dir)
         self._setup()
 
-        # Run sessions simultaneously
-        mult_proc = [
-            Process(
-                target=self._mine_res4d,
-                args=(
-                    sess,
-                    res_path,
-                ),
-            )
-            for sess, res_path in self._res4d_dict.items()
-        ]
-        for proc in mult_proc:
-            proc.start()
-        for proc in mult_proc:
-            proc.join()
-        print("Done : workflow.ClassRest._mine_res4d", flush=True)
+        # Check for previous output
+        out_path = os.path.join(
+            out_dir,
+            f"df_dot-product_model-{self._model_name}_"
+            + f"con-{self._con_name}_task-{self._task_name}.csv",
+        )
+        if os.path.exists(out_path):
+            self._update_db(pd.read_csv(out_path))
+            return
+
+        # Convert volume values to zscore and split
+        res_vols = process.zscore_vols(
+            self._res_path,
+            self._mask_path,
+            out_dir,
+            self._log_dir,
+        )
+
+        # Conduct dot product calculations and volume label
+        do_dot = process.DoDot(res_vols, out_dir, self._mask_path)
+        do_dot.calc_dot(
+            self._weight_maps, self._subj, self._sess, self._log_dir
+        )
+        do_dot.label_vol()
+        do_dot.df_prod.to_csv(out_path, index=False)
+        self._update_db(do_dot.df_prod.copy())
 
         # Upload output and clean
         return
@@ -189,12 +203,8 @@ class ClassRest:
     def _setup(self):
         """Download and check for required files."""
         # Get cleaned resting data
-        self._res4d_dict = {}
-        for sess in self._sess_list:
-            res4d_path = self._ds.dl_rest(self._subj, sess)
-            if res4d_path:
-                self._res4d_dict[sess] = res4d_path
-        if not self._res4d_dict:
+        self._res_path = self._ds.dl_rest(self._subj, self._sess)
+        if not os.path.exists(self._res_path):
             raise FileNotFoundError(
                 f"Missing res4d.nii.gz files for {self._subj}"
             )
@@ -210,34 +220,6 @@ class ClassRest:
             raise FileNotFoundError(
                 "Missing setup files, please execute workflow.wf_setup"
             )
-
-    def _mine_res4d(self, sess: str, res_path: Union[str, os.PathLike]):
-        """Compute dot products for cleaned resting data."""
-        # Check for previous output
-        out_dir = os.path.join(self._work_deriv, self._subj, sess, "func")
-        if not os.path.exists(out_dir):
-            os.makedirs(out_dir)
-        out_path = os.path.join(
-            out_dir,
-            f"df_dot-product_model-{self._model_name}_"
-            + f"con-{self._con_name}_task-{self._task_name}.csv",
-        )
-        if os.path.exists(out_path):
-            self._update_db(pd.read_csv(out_path))
-            return
-
-        # Convert volume values to zscore and split
-        z_split = process.ZscoreVols(
-            res_path, self._mask_path, os.path.dirname(res_path), self._log_dir
-        )
-        z_split.zscore_vols()
-
-        # Conduct dot product calculations and volume label
-        do_dot = process.DoDot(z_split.res_vols, out_dir, self._mask_path)
-        do_dot.parallel_dot(self._weight_maps, self._subj, sess, self._log_dir)
-        do_dot.label_vol()
-        do_dot.df_prod.to_csv(out_path, index=False)
-        self._update_db(do_dot.df_prod.copy())
 
     def _update_db(self, df: pd.DataFrame):
         """Update mysql db_emorep with dot products."""
