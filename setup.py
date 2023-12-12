@@ -13,7 +13,7 @@ setup(
     },
     install_requires=[
         "nibabel>=5.1.0",
-        "pandas>=2.0.0",
+        "pandas>=1.5.2",
         "paramiko>=3.3.1",
         "PyMySQL>=1.1.0",
         "setuptools>=65.5.1",
