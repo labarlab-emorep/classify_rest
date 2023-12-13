@@ -12,6 +12,7 @@ from classify_rest import helper
 from classify_rest import process
 from classify_rest import sql_database
 from func_model.resources import fsl
+from func_model import _version as fsl_ver
 
 
 # %%
@@ -76,7 +77,12 @@ def wf_setup(
         print(f"Making weight mask for : {emo_name}")
         df_emo = df_import[df_import["emo_id"] == emo_name]
         df_emo = df_emo.drop("emo_id", axis=1).reset_index(drop=True)
-        _ = mk_mask.make_mask(df_emo, mask_path, task_name)
+        mask_args = [df_emo, mask_path]
+
+        # TODO resolve version issue
+        if fsl_ver.__version__ == "4.2.0":
+            mask_args.append(task_name)
+        _ = mk_mask.make_mask(*mask_args)
 
     # Clean up
     clust_list = glob.glob(f"{work_deriv}/Clust*txt")
