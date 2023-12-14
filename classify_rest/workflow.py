@@ -114,6 +114,9 @@ class ClassRest:
     mask_name : str
         {"tpl_GM_mask.nii.gz"}
         File name of mask used in beta extraction
+    model_name : str
+        {"sep", "tog"}
+        FSL model name
     task_name : str
         {"movies", "scenarios", "all"}
         FSL task name (all=combined) from first-level models
