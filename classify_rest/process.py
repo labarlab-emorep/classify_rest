@@ -246,6 +246,7 @@ def _calc_dot(
             f">> {out_txt}",
         ]
         bash_cmd = " ".join(_prepend_afni() + dot_list)
+        print(bash_cmd)
         submit.submit_subprocess(bash_cmd)
 
     # Clean txt file of singularity verbiage, write csv

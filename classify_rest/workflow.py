@@ -206,7 +206,7 @@ class ClassRest:
         # Conduct dot product calculations and volume label
         do_dot = process.DoDot(res_vols, out_dir, self._mask_path)
         do_dot.calc_dot(
-            [self._weight_maps[0]],
+            self._weight_maps,
             self._log_dir,
             self._mask_sig,
         )

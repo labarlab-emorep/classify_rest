@@ -175,7 +175,7 @@ def sched_zscore(
         #!/bin/env {sys.executable}
 
         #SBATCH --output={log_dir}/zscore_{subj}_{sess}_%a.txt
-        #SBATCH --array=0-{num_vols - 1}%10
+        #SBATCH --array=0-{num_vols - 1}%40
         #SBATCH --wait
 
         from classify_rest import process
