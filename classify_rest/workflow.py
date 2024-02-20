@@ -4,6 +4,7 @@ wf_setup : setup for computing by downloading and prepping files
 ClassRest : compute dot product for each volume x emotion
 
 """
+
 # %%
 import os
 import glob
@@ -11,13 +12,19 @@ import pandas as pd
 from classify_rest import helper
 from classify_rest import process
 from classify_rest import sql_database
-from func_model.resources import fsl
-from func_model import _version as fsl_ver
+from func_model.resources.fsl import group as fsl_group
 
 
 # %%
 def wf_setup(
-    proj_name, work_deriv, mask_name, model_name, task_name, con_name, log_dir
+    proj_name,
+    work_deriv,
+    mask_name,
+    model_name,
+    task_name,
+    con_name,
+    log_dir,
+    mask_sig,
 ):
     """Get classifier output weights and mask.
 
@@ -45,6 +52,8 @@ def wf_setup(
         Contrast name (e.g. stimWashout) from first-level models
     log_dir : str, os.PathLike
         Location of output directory for logging
+    mask_sig : bool
+        Whether to compute dotprod on signficant voxels
 
     """
     print("Running workflow.wf_setup ...")
@@ -52,43 +61,38 @@ def wf_setup(
     # Download required files from Keoki
     ds = helper.DataSync(proj_name, work_deriv)
     mask_path = ds.dl_gm_mask(mask_name)
-    weight_path = ds.dl_class_weight(model_name, task_name, con_name)
 
-    # Load, check classifier weights
-    df_import = pd.read_csv(weight_path, sep="\t")
-    emo_list = df_import["emo_id"].tolist()
-    if len(emo_list) != 15:
-        raise ValueError(
-            f"Unexpected number of emotions from df.emo_id : {emo_list}"
-        )
+    # Determine MNI coordinate from mask, get emotion list
+    mk_mask = fsl_group.ImportanceMask(mask_path)
+    emo_list = mk_mask.emo_names()
 
-    # Convert weight vectors into MNI spaces
-    mk_mask = fsl.group.ImportanceMask()
-    mk_mask.mine_template(mask_path)
+    # Make mask for classifier weights
     for emo_name in emo_list:
-        mask_path = os.path.join(
+        mask_imp_path = os.path.join(
             work_deriv,
-            f"weight_model-{model_name}_task-{task_name}_"
+            f"importance_model-{model_name}_task-{task_name}_"
             + f"con-{con_name}_emo-{emo_name}_map.nii.gz",
         )
-        if os.path.exists(mask_path):
+        if os.path.exists(mask_imp_path):
             continue
+        _ = mk_mask.sql_masks(
+            "movies", model_name, con_name, emo_name, "importance", work_deriv
+        )
 
-        print(f"Making weight mask for : {emo_name}")
-        df_emo = df_import[df_import["emo_id"] == emo_name]
-        df_emo = df_emo.drop("emo_id", axis=1).reset_index(drop=True)
-        mask_args = [df_emo, mask_path]
-
-        # TODO resolve version issue
-        if fsl_ver.__version__ == "4.2.0":
-            mask_args.append(task_name)
-        _ = mk_mask.make_mask(*mask_args)
-
-    # Clean up
-    clust_list = glob.glob(f"{work_deriv}/Clust*txt")
-    if clust_list:
-        for clust_file in clust_list:
-            os.remove(clust_file)
+    # Make mask for classifier signficant voxels
+    if not mask_sig:
+        return
+    for emo_name in emo_list:
+        mask_bin_path = os.path.join(
+            work_deriv,
+            f"binary_model-{model_name}_task-{task_name}_"
+            + f"con-{con_name}_emo-{emo_name}_map.nii.gz",
+        )
+        if os.path.exists(mask_bin_path):
+            continue
+        _ = mk_mask.sql_masks(
+            "movies", model_name, con_name, emo_name, "binary", work_deriv
+        )
 
 
 class ClassRest:
@@ -127,6 +131,8 @@ class ClassRest:
         Location of output parent directory
     log_dir : str, os.PathLike
         Location of output directory for logging
+    mask_sig : bool
+        Whether to compute dotprod on signficant voxels
 
     Methods
     -------
@@ -151,6 +157,7 @@ class ClassRest:
         con_name,
         work_deriv,
         log_dir,
+        mask_sig,
     ):
         """Initialize."""
         self._subj = subj
@@ -162,6 +169,7 @@ class ClassRest:
         self._con_name = con_name
         self._work_deriv = work_deriv
         self._log_dir = log_dir
+        self._mask_sig = mask_sig
 
         # Check options and get data sync object
         helper.check_proj_sess(proj_name, [sess])
@@ -198,7 +206,9 @@ class ClassRest:
         # Conduct dot product calculations and volume label
         do_dot = process.DoDot(res_vols, out_dir, self._mask_path)
         do_dot.calc_dot(
-            self._weight_maps, self._subj, self._sess, self._log_dir
+            [self._weight_maps[0]],
+            self._log_dir,
+            self._mask_sig,
         )
         do_dot.label_vol()
         do_dot.df_prod.to_csv(out_path, index=False)
@@ -217,10 +227,10 @@ class ClassRest:
                 f"Missing res4d.nii.gz files for {self._subj}"
             )
 
-        # Check for wf_setup output
+        # Orient to wf_setup output files
         self._mask_path = os.path.join(self._work_deriv, self._mask_name)
         map_str = (
-            f"weight_model-{self._model_name}_task-{self._task_name}_"
+            f"importance_model-{self._model_name}_task-{self._task_name}_"
             + f"con-{self._con_name}_emo-*_map.nii.gz"
         )
         self._weight_maps = sorted(glob.glob(f"{self._work_deriv}/{map_str}"))

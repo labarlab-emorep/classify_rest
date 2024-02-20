@@ -8,6 +8,7 @@ sched_zscore : schedule process._CalcZscore with SLURM
 sched_dotprod : schedule process._DotProd with SLURM
 
 """
+
 import os
 import sys
 import subprocess
@@ -68,6 +69,7 @@ def sched_setup(
     task_name: str,
     con_name: str,
     log_dir: Union[str, os.PathLike],
+    mask_sig: bool,
 ):
     """Schedule workflow.wf_setup."""
     chk_file = os.path.join(
@@ -78,7 +80,7 @@ def sched_setup(
     if os.path.exists(chk_file):
         return
 
-    print("Running Setup ...")
+    print("Running Setup, please wait ...")
     sbatch_cmd = f"""\
         #!/bin/env {sys.executable}
 
@@ -99,6 +101,7 @@ def sched_setup(
             "{task_name}",
             "{con_name}",
             "{log_dir}",
+            {mask_sig},
         )
 
     """
@@ -119,6 +122,7 @@ def sched_workflow(
     con_name: str,
     work_deriv: Union[str, os.PathLike],
     log_dir: Union[str, os.PathLike],
+    mask_sig: bool,
 ):
     """Schedule workflow.ClassRest."""
     sbatch_cmd = f"""\
@@ -142,6 +146,7 @@ def sched_workflow(
             "{con_name}",
             "{work_deriv}",
             "{log_dir}",
+            {mask_sig},
         )
         cr.label_vols()
 
@@ -196,6 +201,7 @@ def sched_dotprod(
     weight_path: Union[str, os.PathLike],
     subj_deriv: Union[str, os.PathLike],
     log_dir: Union[str, os.PathLike],
+    mask_sig: bool,
 ):
     """Schedule process._DotProd."""
     subj = subj_deriv.split("sub-")[1].split("/")[0]
@@ -218,6 +224,7 @@ def sched_dotprod(
             "{weight_path}",
             "{mask_path}",
             "{subj_deriv}",
+            {mask_sig},
         )
 
     """

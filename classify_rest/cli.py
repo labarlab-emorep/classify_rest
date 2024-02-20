@@ -1,4 +1,4 @@
-"""Compute dot product between classifier weights and rest EPI data.
+r"""Compute dot product between classifier weights and rest EPI data.
 
 Z-score each volume of cleaned resting state EPI data and then
 compute dot product of volume z-score and classifier weight for
@@ -19,10 +19,20 @@ Notes
 
 Examples
 --------
-classify_rest -p emorep -e ses-day2 ses-day3 -s sub-ER0016
-classify_rest -p archival -e ses-BAS1 -s sub-08326 sub-08399
+classify_rest \
+    -p emorep \
+    -e ses-day2 ses-day3 \
+    -s sub-ER0016 \
+    --mask-sig
+
+classify_rest \
+    -p archival \
+    -e ses-BAS1 \
+    -s sub-08326 sub-08399 \
+    --mask-sig
 
 """
+
 # %%
 import os
 import sys
@@ -62,6 +72,11 @@ def _get_args():
             (default : %(default)s)
             """
         ),
+    )
+    parser.add_argument(
+        "--mask-sig",
+        action="store_true",
+        help="Whether to mask dotprod with significant classifer voxels",
     )
     parser.add_argument(
         "--model-name",
@@ -133,6 +148,7 @@ def main():
     model_name = args.model_name
     task_name = args.task_name
     con_name = args.contrast_name
+    mask_sig = args.mask_sig
 
     # Check arguments
     helper.check_rsa()
@@ -166,6 +182,7 @@ def main():
         task_name,
         con_name,
         log_dir,
+        mask_sig,
     )
 
     # Conduct workflow for each subject, session
@@ -182,6 +199,7 @@ def main():
                 con_name,
                 work_deriv,
                 log_dir,
+                mask_sig,
             )
 
 

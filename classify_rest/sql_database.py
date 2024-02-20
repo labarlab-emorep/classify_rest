@@ -4,6 +4,7 @@ db_update : update db_emorep
 df_format : convert df values into format for db_update
 
 """
+
 import os
 import pandas as pd
 import pymysql
@@ -14,7 +15,7 @@ from classify_rest import helper
 
 def _tbl_name(proj_name: str) -> str:
     """Return db_emorep table name."""
-    return f"tbl_dotprod_{proj_name}_202312"
+    return f"tbl_dotprod_{proj_name}_202402"
 
 
 def db_update(proj_name: str, tbl_input: list):
@@ -44,17 +45,22 @@ def db_update(proj_name: str, tbl_input: list):
         port=ssh_tunnel.local_bind_port,
     )
 
-    # Update db table
+    # Get column names
     db_cur = db_con.cursor()
     sql_cmd = (
-        f"insert ignore into {_tbl_name(proj_name)} "
-        + "(subj_id, sess_id, task_id, model_id, con_id, mask_id, volume, "
-        + "emo_amusement, emo_anger, emo_anxiety, emo_awe, emo_calmness, "
-        + "emo_craving, emo_disgust, emo_excitement, emo_fear, emo_horror, "
-        + "emo_joy, emo_neutral, emo_romance, emo_sadness, emo_surprise, "
-        + "label_max) "
-        + "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, "
-        + "%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+        "select column_name from information_schema.columns "
+        + "where table_schema='db_emorep' "
+        + f"and table_name='{_tbl_name(proj_name)}'"
+    )
+    db_cur.execute(sql_cmd)
+    rows = db_cur.fetchall()
+
+    # Build insert command, update table
+    col_list = [x[0] for x in rows]
+    val_list = ["%s" for x in col_list]
+    sql_cmd = (
+        f"insert ignore into {_tbl_name(proj_name)} ({', '.join(col_list)}) "
+        + f"values ({', '.join(val_list)})"
     )
     db_cur.executemany(sql_cmd, tbl_input)
     db_con.commit()
