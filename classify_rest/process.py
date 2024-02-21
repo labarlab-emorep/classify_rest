@@ -5,6 +5,7 @@ DoDot : compute dot product between classifier weight matrix and
         cleaned resting state volumes.
 
 """
+
 import os
 import glob
 from typing import Union
@@ -179,6 +180,7 @@ def _calc_dot(
     weight_path: Union[str, os.PathLike],
     mask_path: Union[str, os.PathLike],
     subj_deriv: Union[str, os.PathLike],
+    mask_sig: bool,
 ):
     """Calculate dot products.
 
@@ -187,12 +189,12 @@ def _calc_dot(
 
     """
     # Start empty output file
+    par_dir = os.path.dirname(mask_path)
     out_txt = os.path.join(subj_deriv, f"tmp_df_{emo_name}_weight.txt")
     open(out_txt, "w").close()
 
     def _prepend_afni() -> list:
         """Return singularity call setup."""
-        par_dir = os.path.dirname(mask_path)
         return [
             "singularity",
             "run",
@@ -202,6 +204,37 @@ def _calc_dot(
             f"--bind {subj_deriv}:/opt/home",
             os.environ["SING_AFNI"],
         ]
+
+    def _mult_mask() -> Union[str, os.PathLike]:
+        """Multiple binary mask with ROI."""
+        # Find binary mask, check for previous work
+        bin_path = weight_path.replace("importance", "binary")
+        if not os.path.exists(bin_path):
+            raise FileNotFoundError(f"Expected binary mask : {bin_path}")
+        bin_out = os.path.join(
+            subj_deriv, "tmp_mlt_" + os.path.basename(bin_path)
+        )
+        if os.path.exists(bin_out):
+            return bin_out
+
+        # Conduct mask * binary mult, check for output
+        mult_list = [
+            "3dcalc",
+            f"-a {mask_path}",
+            f"-b {bin_path}",
+            f"-prefix {bin_out}",
+            "-expr 'a*step(b)'",
+        ]
+        bash_cmd = " ".join(_prepend_afni() + mult_list)
+        submit.submit_subprocess(bash_cmd)
+        if not os.path.exists(bin_out):
+            raise FileNotFoundError(
+                f"Missing ROI-binary intersection mask : {bin_out}"
+            )
+        return bin_out
+
+    # Multiply ROI (template GM) mask by binary classifier mask
+    mask_path = _mult_mask() if mask_sig else mask_path
 
     # Calc dot product for each volume
     for vol, res_path in res_vols.items():
@@ -213,6 +246,7 @@ def _calc_dot(
             f">> {out_txt}",
         ]
         bash_cmd = " ".join(_prepend_afni() + dot_list)
+        print(bash_cmd)
         submit.submit_subprocess(bash_cmd)
 
     # Clean txt file of singularity verbiage, write csv
@@ -273,14 +307,10 @@ class DoDot:
     def calc_dot(
         self,
         weight_maps: list,
-        subj: str,
-        sess: str,
         log_dir: Union[str, os.PathLike],
+        mask_sig: bool,
     ):
         """Compute dot product of each weight map in parallel."""
-        self._subj = subj
-        self._sess = sess
-        self._log_dir = log_dir
 
         def _emo_name(weight_path: Union[str, os.PathLike]) -> str:
             """Return emotion name."""
@@ -296,7 +326,8 @@ class DoDot:
                     self._mask_path,
                     weight_path,
                     self._subj_deriv,
-                    self._log_dir,
+                    log_dir,
+                    mask_sig,
                 ),
             )
             for weight_path in weight_maps

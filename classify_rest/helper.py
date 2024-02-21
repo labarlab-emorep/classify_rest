@@ -8,6 +8,7 @@ KeokiPaths : supply addresses and paths for labarserv2, keoki
 DataSync : manage data down/uploads
 
 """
+
 import os
 import glob
 from typing import Tuple, Union
@@ -99,6 +100,7 @@ class DataSync(KeokiPaths):
     dl_gm_mask()
         Download tpl_GM_mask.nii.gz
     dl_class_weight()
+        Deprecated.
         Download classifier weights
     dl_rest()
         Download cleaned resting state data (res4d.nii.gz)
@@ -160,6 +162,7 @@ class DataSync(KeokiPaths):
         con_name: str,
     ) -> Union[str, os.PathLike]:
         """Download classifier weights, return file path."""
+        return
         weight_name = (
             f"level-first_name-{model_name}_task-{task_name}_"
             + f"con-{con_name}Washout_voxel-importance_weighted.tsv"

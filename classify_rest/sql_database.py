@@ -1,129 +1,218 @@
 """Methods for sending data to mysql database db_emorep.
 
-db_update : update db_emorep
-df_format : convert df values into format for db_update
+DbConnect : connect to and interact with db_emorep on mysql server
+db_update : update db_emorep.tbl_dotprod_*
 
 """
+
 import os
+from typing import Type
+from contextlib import contextmanager
 import pandas as pd
 import pymysql
 import paramiko
 from sshtunnel import SSHTunnelForwarder
-from classify_rest import helper
 
 
 def _tbl_name(proj_name: str) -> str:
     """Return db_emorep table name."""
-    return f"tbl_dotprod_{proj_name}_202312"
+    return f"tbl_dotprod_{proj_name}_202402"
 
 
-def db_update(proj_name: str, tbl_input: list):
-    """Update db_emorep table on labarserv2."""
-    helper.check_rsa()
-    helper.check_sql_pass()
-    if len(tbl_input[0]) != 23:
-        raise ValueError("Unexpected number of values for insert")
+class DbConnect:
+    """Supply db_emorep database connection and interaction methods.
 
-    # Setup ssh tunnel
-    dst_ip = helper.KeokiPaths(proj_name).labarserv2_ip
-    ras_keoki = paramiko.RSAKey.from_private_key_file(os.environ["RSA_LS2"])
-    ssh_tunnel = SSHTunnelForwarder(
-        (dst_ip, 22),
-        ssh_username=os.environ["USER"],
-        ssh_pkey=ras_keoki,
-        remote_bind_address=("127.0.0.1", 3306),
-    )
-    ssh_tunnel.start()
+    Attributes
+    ----------
+    con : mysql.connector.connection_cext.CMySQLConnection
+        Connection object to database
 
-    # Create connection to mysql db
-    db_con = pymysql.connect(
-        host="127.0.0.1",
-        user=os.environ["USER"],
-        passwd=os.environ["SQL_PASS"],
-        db="db_emorep",
-        port=ssh_tunnel.local_bind_port,
-    )
+    Methods
+    -------
+    close_con()
+        Close database connection
+    exec_many()
+        Update mysql db_emorep.tbl_* with multiple values
+    fetch_df()
+        Return pd.DataFrame from query statement
+    fetch_rows()
+        Return rows from query statement
 
-    # Update db table
-    db_cur = db_con.cursor()
-    sql_cmd = (
-        f"insert ignore into {_tbl_name(proj_name)} "
-        + "(subj_id, sess_id, task_id, model_id, con_id, mask_id, volume, "
-        + "emo_amusement, emo_anger, emo_anxiety, emo_awe, emo_calmness, "
-        + "emo_craving, emo_disgust, emo_excitement, emo_fear, emo_horror, "
-        + "emo_joy, emo_neutral, emo_romance, emo_sadness, emo_surprise, "
-        + "label_max) "
-        + "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, "
-        + "%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
-    )
-    db_cur.executemany(sql_cmd, tbl_input)
-    db_con.commit()
+    Notes
+    -----
+    Requires environment variable 'SQL_PASS' to contain user password
+    for mysql db_emorep.
 
-    # Shutdown
-    db_cur.close()
-    db_con.close()
-    ssh_tunnel.stop()
+    Example
+    -------
+    db_con = DbConnect()
+    row = db_con.fetch_rows("select * from ref_subj limit 1")
+    db_con.close_con()
+
+    """
+
+    def __init__(self):
+        """Set con attr as mysql connection."""
+        try:
+            os.environ["SQL_PASS"]
+        except KeyError as e:
+            raise Exception(
+                "No global variable 'SQL_PASS' defined in user env"
+            ) from e
+
+        self._connect_dcc()
+
+    def _connect_dcc(self):
+        """Connect to MySQL server from DCC."""
+        try:
+            os.environ["RSA_LS2"]
+        except KeyError as e:
+            raise Exception(
+                "No global variable 'RSA_LS2' defined in user env"
+            ) from e
+
+        self._connect_ssh()
+        self.con = pymysql.connect(
+            host="127.0.0.1",
+            user=os.environ["USER"],
+            passwd=os.environ["SQL_PASS"],
+            db="db_emorep",
+            port=self._ssh_tunnel.local_bind_port,
+        )
+
+    def _connect_ssh(self):
+        """Start ssh tunnel."""
+        rsa_keoki = paramiko.RSAKey.from_private_key_file(
+            os.environ["RSA_LS2"]
+        )
+        self._ssh_tunnel = SSHTunnelForwarder(
+            ("ccn-labarserv2.vm.duke.edu", 22),
+            ssh_username=os.environ["USER"],
+            ssh_pkey=rsa_keoki,
+            remote_bind_address=("127.0.0.1", 3306),
+        )
+        self._ssh_tunnel.start()
+
+    @contextmanager
+    def _con_cursor(self):
+        """Yield cursor."""
+        cursor = self.con.cursor()
+        try:
+            yield cursor
+        finally:
+            cursor.close()
+
+    def exec_many(self, sql_cmd: str, value_list: list):
+        """Update db_emorep via executemany.
+
+        Example
+        -------
+        db_con = sql_database.DbConnect()
+        sql_cmd = (
+            "insert ignore into ref_subj (subj_id, subj_name) values (%s, %s)"
+        )
+        tbl_input = [(9, "ER0009"), (16, "ER0016")]
+        db_con.exec_many(sql_cmd, tbl_input)
+
+        """
+        with self._con_cursor() as cur:
+            cur.executemany(sql_cmd, value_list)
+            self.con.commit()
+
+    def fetch_rows(self, sql_cmd: str) -> list:
+        """Return rows from query output.
+
+        Example
+        -------
+        db_con = sql_database.DbConnect()
+        sql_cmd = "select * from ref_subj"
+        rows = db_con.fetch_df(sql_cmd)
+
+        """
+        with self._con_cursor() as cur:
+            cur.execute(sql_cmd)
+            rows = cur.fetchall()
+        return rows
+
+    def close_con(self):
+        """Close database connection."""
+        self.con.close()
+        self._ssh_tunnel.stop()
 
 
 class _KeyMap:
     """Supply mappings for db_emorep foreign keys."""
 
+    def __init__(self, db_con: Type[DbConnect]):
+        """Initialize."""
+        self._db_con = db_con
+        self._load_refs()
+
+    def _load_refs(self):
+        """Supply mappings in format {name: id}."""
+        self._ref_sess = {
+            x[1]: x[0]
+            for x in self._db_con.fetch_rows("select * from ref_sess")
+        }
+        self._ref_mask = {
+            x[1]: x[0]
+            for x in self._db_con.fetch_rows("select * from ref_mask")
+        }
+        self._ref_model = {
+            x[1]: x[0]
+            for x in self._db_con.fetch_rows("select * from ref_fsl_model")
+        }
+        self._ref_task = {
+            x[1]: x[0]
+            for x in self._db_con.fetch_rows("select * from ref_fsl_task")
+        }
+        self._ref_con = {
+            x[1]: x[0]
+            for x in self._db_con.fetch_rows("select * from ref_fsl_contrast")
+        }
+        self._ref_emo = {
+            x[1]: x[0]
+            for x in self._db_con.fetch_rows("select * from ref_emo")
+        }
+
     def subj_map(self, subj: str, proj_name: str) -> int:
+        """Return subj_id."""
         if proj_name == "emorep":
             return int(subj[6:])
         elif proj_name == "archival":
             return int(subj[4:])
 
     def sess_map(self, sess: str) -> int:
-        if sess == "ses-BAS1":
-            return 4
-        else:
-            return int(sess[-1])
+        """Return sess_id."""
+        sess_low = sess.split("-")[-1].lower()
+        return self._ref_sess[sess_low]
 
-    def mask_map(self, mask: str) -> int:
-        _map = {"tpl_GM_mask.nii.gz": 1}
-        return _map[mask]
+    def mask_map(self, mask: str, mask_sig: bool) -> int:
+        """Return mask_id."""
+        if mask_sig:
+            return self._ref_mask["Sig Voxel"]
+        return self._ref_mask["GM"]
 
     def model_map(self, model: str) -> int:
-        _map = {"sep": 1, "tog": 2, "rest": 3, "lss": 4}
-        return _map[model]
+        """Return model_id."""
+        return self._ref_model[model]
 
     def task_map(self, task: str) -> int:
-        _map = {"movies": 1, "scenarios": 2, "both": 3}
-        return _map[task]
+        """Return task_id."""
+        return self._ref_task[task]
 
     def con_map(self, con: str) -> int:
-        _map = {"stim": 1, "tog": 2, "replay": 3}
-        return _map[con]
+        """Return con_id"""
+        return self._ref_con[con]
 
-    @property
-    def emo_map(self) -> dict:
-        return {
-            "amusement": 1,
-            "anger": 2,
-            "anxiety": 3,
-            "awe": 4,
-            "calmness": 5,
-            "craving": 6,
-            "disgust": 7,
-            "excitement": 8,
-            "fear": 9,
-            "horror": 10,
-            "joy": 11,
-            "neutral": 12,
-            "romance": 13,
-            "sadness": 14,
-            "surprise": 15,
-        }
-
-    def emo_label(self, row, row_name):
-        """Update column values."""
-        for emo_name, emo_id in self.emo_map.items():
+    def emo_label(self, row, row_name) -> int:
+        """Update column values with emo_id."""
+        for emo_name, emo_id in self._ref_emo.items():
             if row[row_name] == emo_name:
                 return emo_id
 
 
-def df_format(
+def db_update(
     df: pd.DataFrame,
     subj: str,
     sess: str,
@@ -132,45 +221,37 @@ def df_format(
     model_name: str,
     task_name: str,
     con_name: str,
+    mask_sig: bool,
 ) -> list:
     """Make df compliant with db_emorep, return list of tuples."""
     # Add foreign key columns
-    km = _KeyMap()
+    db_con = DbConnect()
+    km = _KeyMap(db_con)
     df["subj_id"] = km.subj_map(subj, proj_name)
     df["sess_id"] = km.sess_map(sess)
     df["task_id"] = km.task_map(task_name)
     df["model_id"] = km.model_map(model_name)
     df["con_id"] = km.con_map(con_name)
-    df["mask_id"] = km.mask_map(mask_name)
+    df["mask_id"] = km.mask_map(mask_name, mask_sig)
 
     # Replace alpha emo with key value
     df["label_max"] = df.apply(lambda x: km.emo_label(x, "label_max"), axis=1)
 
-    # Generate input for sql command
-    cols_ordered = [
-        "subj_id",
-        "sess_id",
-        "task_id",
-        "model_id",
-        "con_id",
-        "mask_id",
-        "volume",
-        "emo_amusement",
-        "emo_anger",
-        "emo_anxiety",
-        "emo_awe",
-        "emo_calmness",
-        "emo_craving",
-        "emo_disgust",
-        "emo_excitement",
-        "emo_fear",
-        "emo_horror",
-        "emo_joy",
-        "emo_neutral",
-        "emo_romance",
-        "emo_sadness",
-        "emo_surprise",
-        "label_max",
-    ]
-    tbl_input = list(df[cols_ordered].itertuples(index=False, name=None))
-    return tbl_input
+    # Generate input for execute many
+    sql_cmd = (
+        "select column_name from information_schema.columns "
+        + "where table_schema='db_emorep' "
+        + f"and table_name='{_tbl_name(proj_name)}'"
+    )
+    rows = db_con.fetch_rows(sql_cmd)
+    col_list = [x[0] for x in rows]
+    val_list = ["%s" for x in col_list]
+    tbl_input = list(df[col_list].itertuples(index=False, name=None))
+
+    # Built sql_cmd, update db
+    sql_cmd = (
+        f"insert ignore into {_tbl_name(proj_name)} ({', '.join(col_list)}) "
+        + f"values ({', '.join(val_list)})"
+    )
+    db_con.exec_many(sql_cmd, tbl_input)
+    db_con.close_con()
