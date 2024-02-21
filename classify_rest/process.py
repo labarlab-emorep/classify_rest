@@ -189,12 +189,12 @@ def _calc_dot(
 
     """
     # Start empty output file
+    par_dir = os.path.dirname(mask_path)
     out_txt = os.path.join(subj_deriv, f"tmp_df_{emo_name}_weight.txt")
     open(out_txt, "w").close()
 
     def _prepend_afni() -> list:
         """Return singularity call setup."""
-        par_dir = os.path.dirname(mask_path)
         return [
             "singularity",
             "run",
