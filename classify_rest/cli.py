@@ -29,7 +29,8 @@ classify_rest \
     -p archival \
     -e ses-BAS1 \
     -s sub-08326 sub-08399 \
-    --mask-sig
+    --mask-sig \
+    --no-setup
 
 """
 
@@ -88,6 +89,11 @@ def _get_args():
             (default : %(default)s)
             """
         ),
+    )
+    parser.add_argument(
+        "--no-setup",
+        action="store_true",
+        help="Use to bypass generating existing setup files",
     )
     parser.add_argument(
         "--task-name",
@@ -149,6 +155,7 @@ def main():
     task_name = args.task_name
     con_name = args.contrast_name
     mask_sig = args.mask_sig
+    no_setup = args.no_setup
 
     # Check arguments
     helper.check_rsa()
@@ -174,16 +181,17 @@ def main():
             os.makedirs(chk_dir)
 
     # Download classifier weights and mask
-    submit.sched_setup(
-        proj_name,
-        work_deriv,
-        mask_name,
-        model_name,
-        task_name,
-        con_name,
-        log_dir,
-        mask_sig,
-    )
+    if not no_setup:
+        submit.sched_setup(
+            proj_name,
+            work_deriv,
+            mask_name,
+            model_name,
+            task_name,
+            con_name,
+            log_dir,
+            mask_sig,
+        )
 
     # Conduct workflow for each subject, session
     print("Submitting workflow ...")
