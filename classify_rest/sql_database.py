@@ -193,16 +193,16 @@ class _KeyMap:
             return self._ref_mask["Sig Voxel"]
         return self._ref_mask["GM"]
 
-    def model_map(self, model: str) -> int:
-        """Return model_id."""
+    def fsl_model_map(self, model: str) -> int:
+        """Return fsl_model_id."""
         return self._ref_model[model]
 
-    def task_map(self, task: str) -> int:
-        """Return task_id."""
+    def fsl_task_map(self, task: str) -> int:
+        """Return fsl_task_id."""
         return self._ref_task[task]
 
-    def con_map(self, con: str) -> int:
-        """Return con_id"""
+    def fsl_con_map(self, con: str) -> int:
+        """Return fsl_con_id"""
         return self._ref_con[con]
 
     def emo_label(self, row, row_name) -> int:
@@ -229,9 +229,9 @@ def db_update(
     km = _KeyMap(db_con)
     df["subj_id"] = km.subj_map(subj, proj_name)
     df["sess_id"] = km.sess_map(sess)
-    df["task_id"] = km.task_map(task_name)
-    df["model_id"] = km.model_map(model_name)
-    df["con_id"] = km.con_map(con_name)
+    df["fsl_task_id"] = km.fsl_task_map(task_name)
+    df["fsl_model_id"] = km.fsl_model_map(model_name)
+    df["fsl_con_id"] = km.fsl_con_map(con_name)
     df["mask_id"] = km.mask_map(mask_name, mask_sig)
 
     # Replace alpha emo with key value
