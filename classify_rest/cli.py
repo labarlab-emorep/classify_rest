@@ -26,6 +26,13 @@ classify_rest \
     --mask-sig
 
 classify_rest \
+    -p emorep \
+    -e ses-day2 ses-day3 \
+    -s sub-ER0016 \
+    --task-name match \
+    --mask-sig
+
+classify_rest \
     -p archival \
     -e ses-BAS1 \
     -s sub-08326 sub-08399 \
@@ -97,11 +104,14 @@ def _get_args():
     )
     parser.add_argument(
         "--task-name",
-        choices=["movies", "scenarios", "all"],
+        choices=["movies", "scenarios", "both", "match"],
         default="movies",
         help=textwrap.dedent(
             """\
-            Task name of classifier
+            Classifier name (informs which data classifier was trained
+            on). 'match' to use movie classifier on move sessions
+            and scenario classifier on scenario sessions.
+            Parameter 'both' is not currently supported.
             (default : %(default)s)
             """
         ),
@@ -158,6 +168,9 @@ def main():
     no_setup = args.no_setup
 
     # Check arguments
+    if task_name == "both":
+        print("'--class-name both' not currently supported")
+        sys.exit(0)
     helper.check_rsa()
     helper.check_afni()
     helper.check_sql_pass()

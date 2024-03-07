@@ -8,6 +8,7 @@ ClassRest : compute dot product for each volume x emotion
 # %%
 import os
 import glob
+from typing import Union
 import pandas as pd
 from classify_rest import helper
 from classify_rest import process
@@ -45,8 +46,9 @@ def wf_setup(
         {"sep", "tog"}
         FSL model name from first-level models
     task_name : str
-        {"movies", "scenarios", "all"}
-        FSL task name (all=combined) from first-level models
+        {"movies", "scenarios", "both", "match"}
+        FSL task name (both=combined) from first-level models,
+        match to align session task with classifier.
     con_name : str
         {"stim", "replay", "tog"}
         Contrast name (e.g. stimWashout) from first-level models
@@ -66,33 +68,38 @@ def wf_setup(
     mk_mask = fsl_group.ImportanceMask(mask_path)
     emo_list = mk_mask.emo_names()
 
-    # Make mask for classifier weights
-    for emo_name in emo_list:
-        mask_imp_path = os.path.join(
+    def _build_mask(
+        class_name: str, mask_type: str
+    ) -> Union[str, os.PathLike]:
+        """Wrap mk_mask.sql_mask."""
+        out_path = os.path.join(
             work_deriv,
-            f"importance_model-{model_name}_task-{task_name}_"
+            f"{mask_type}_model-{model_name}_task-{class_name}_"
             + f"con-{con_name}_emo-{emo_name}_map.nii.gz",
         )
-        if os.path.exists(mask_imp_path):
-            continue
-        _ = mk_mask.sql_masks(
-            "movies", model_name, con_name, emo_name, "importance", work_deriv
+        if os.path.exists(out_path):
+            return out_path
+        return mk_mask.sql_masks(
+            class_name, model_name, con_name, emo_name, mask_type, work_deriv
         )
 
-    # Make mask for classifier signficant voxels
-    if not mask_sig:
-        return
+    def _org_build(mask_type: str) -> Union[list, str, os.PathLike]:
+        """Determine which masks to build."""
+        if task_name == "match":
+            out_list = []
+            for class_name in ["movies", "scenarios"]:
+                out_list.append(_build_mask(class_name, mask_type))
+            return out_list
+        else:
+            return _build_mask(task_name, mask_type)
+
+    # Make masks for each emotion classifier
     for emo_name in emo_list:
-        mask_bin_path = os.path.join(
-            work_deriv,
-            f"binary_model-{model_name}_task-{task_name}_"
-            + f"con-{con_name}_emo-{emo_name}_map.nii.gz",
-        )
-        if os.path.exists(mask_bin_path):
-            continue
-        _ = mk_mask.sql_masks(
-            "movies", model_name, con_name, emo_name, "binary", work_deriv
-        )
+
+        # Make mask for voxels importance, significance
+        _ = _org_build("importance")
+        if mask_sig:
+            _ = _org_build("binary")
 
 
 class ClassRest:
@@ -122,8 +129,9 @@ class ClassRest:
         {"sep", "tog"}
         FSL model name
     task_name : str
-        {"movies", "scenarios", "all"}
-        FSL task name (all=combined) from first-level models
+        {"movies", "scenarios", "both", "match"}
+        FSL task name (both=combined) from first-level models,
+        match to align session task with classifier.
     con_name : str
         {"stim", "replay", "tog"}
         Contrast name (e.g. stimWashout) from first-level models
