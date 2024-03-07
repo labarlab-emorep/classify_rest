@@ -255,3 +255,18 @@ def db_update(
     )
     db_con.exec_many(sql_cmd, tbl_input)
     db_con.close_con()
+
+
+def get_sess_name(subj: str, sess: str) -> str:
+    """Determine session task name."""
+    db_con = DbConnect()
+    km = _KeyMap(db_con)
+    sql_cmd = (
+        "select b.task_name from ref_sess_task a "
+        + "join ref_task b on a.task_id = b.task_id "
+        + f"where a.subj_id = {km.subj_map(subj, 'emorep')} "
+        + f"and a.sess_id = {km.sess_map(sess)}"
+    )
+    rows = db_con.fetch_rows(sql_cmd)
+    db_con.close_con()
+    return rows[0][0]

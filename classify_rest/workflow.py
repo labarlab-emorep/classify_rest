@@ -9,7 +9,6 @@ ClassRest : compute dot product for each volume x emotion
 import os
 import glob
 from typing import Union
-import pandas as pd
 from classify_rest import helper
 from classify_rest import process
 from classify_rest import sql_database
@@ -48,7 +47,7 @@ def wf_setup(
     task_name : str
         {"movies", "scenarios", "both", "match"}
         FSL task name (both=combined) from first-level models,
-        match to align session task with classifier.
+        'match' to align session task with classifier.
     con_name : str
         {"stim", "replay", "tog"}
         Contrast name (e.g. stimWashout) from first-level models
@@ -131,7 +130,7 @@ class ClassRest:
     task_name : str
         {"movies", "scenarios", "both", "match"}
         FSL task name (both=combined) from first-level models,
-        match to align session task with classifier.
+        'match' to align session task with classifier.
     con_name : str
         {"stim", "replay", "tog"}
         Contrast name (e.g. stimWashout) from first-level models
@@ -173,7 +172,11 @@ class ClassRest:
         self._proj_name = proj_name
         self._mask_name = mask_name
         self._model_name = model_name
-        self._task_name = task_name
+        self._task_name = (
+            task_name
+            if task_name != "match"
+            else sql_database.get_sess_name(subj, sess)
+        )
         self._con_name = con_name
         self._work_deriv = work_deriv
         self._log_dir = log_dir
@@ -193,16 +196,6 @@ class ClassRest:
             os.makedirs(out_dir)
         self._setup()
 
-        # Check for previous output
-        out_path = os.path.join(
-            out_dir,
-            f"df_dot-product_model-{self._model_name}_"
-            + f"con-{self._con_name}_task-{self._task_name}.csv",
-        )
-        if os.path.exists(out_path):
-            self._update_db(pd.read_csv(out_path))
-            return
-
         # Convert volume values to zscore and split
         res_vols = process.zscore_vols(
             self._res_path,
@@ -219,6 +212,11 @@ class ClassRest:
             self._mask_sig,
         )
         do_dot.label_vol()
+        out_path = os.path.join(
+            out_dir,
+            f"df_dot-product_model-{self._model_name}_"
+            + f"con-{self._con_name}_task-{self._task_name}.csv",
+        )
         do_dot.df_prod.to_csv(out_path, index=False)
 
         # Update db_emorep.tbl_dotprod_*
