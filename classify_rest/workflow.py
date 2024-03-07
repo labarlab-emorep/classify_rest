@@ -220,7 +220,10 @@ class ClassRest:
         do_dot.df_prod.to_csv(out_path, index=False)
 
         # Update db_emorep.tbl_dotprod_*
-        print("Updating db_emorep.tbl_dotprod_* ...")
+        print(
+            "Updating db_emorep.tbl_dotprod_* for "
+            + f"{self._subj} {self._sess} ..."
+        )
         sql_database.db_update(
             do_dot.df_prod.copy(),
             self._subj,

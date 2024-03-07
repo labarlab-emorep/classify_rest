@@ -358,7 +358,8 @@ class DoDot:
             self.df_prod = self.df_prod.merge(df, how="left", on="volume")
 
         # Assign volume labels
-        self.df_prod["label_max"] = self.df_prod.idxmax(axis=1)
+        emo_cols = [x for x in self.df_prod.columns if x != "volume"]
+        self.df_prod["label_max"] = self.df_prod[emo_cols].idxmax(axis=1)
         self.df_prod["label_max"] = self.df_prod["label_max"].str.replace(
             "emo_", ""
         )
