@@ -14,11 +14,6 @@ import paramiko
 from sshtunnel import SSHTunnelForwarder
 
 
-def _tbl_name(proj_name: str) -> str:
-    """Return db_emorep table name."""
-    return f"tbl_dotprod_{proj_name}_202402"
-
-
 class DbConnect:
     """Supply db_emorep database connection and interaction methods.
 
@@ -241,7 +236,7 @@ def db_update(
     sql_cmd = (
         "select column_name from information_schema.columns "
         + "where table_schema='db_emorep' "
-        + f"and table_name='{_tbl_name(proj_name)}'"
+        + f"and table_name='tbl_dotprod_{proj_name}'"
     )
     rows = db_con.fetch_rows(sql_cmd)
     col_list = [x[0] for x in rows]
@@ -250,7 +245,7 @@ def db_update(
 
     # Built sql_cmd, update db
     sql_cmd = (
-        f"insert ignore into {_tbl_name(proj_name)} ({', '.join(col_list)}) "
+        f"insert ignore into tbl_dotprod_{proj_name} ({', '.join(col_list)}) "
         + f"values ({', '.join(val_list)})"
     )
     db_con.exec_many(sql_cmd, tbl_input)
