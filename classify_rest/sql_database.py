@@ -14,11 +14,6 @@ import paramiko
 from sshtunnel import SSHTunnelForwarder
 
 
-def _tbl_name(proj_name: str) -> str:
-    """Return db_emorep table name."""
-    return f"tbl_dotprod_{proj_name}_202402"
-
-
 class DbConnect:
     """Supply db_emorep database connection and interaction methods.
 
@@ -193,16 +188,16 @@ class _KeyMap:
             return self._ref_mask["Sig Voxel"]
         return self._ref_mask["GM"]
 
-    def model_map(self, model: str) -> int:
-        """Return model_id."""
+    def fsl_model_map(self, model: str) -> int:
+        """Return fsl_model_id."""
         return self._ref_model[model]
 
-    def task_map(self, task: str) -> int:
-        """Return task_id."""
+    def fsl_task_map(self, task: str) -> int:
+        """Return fsl_task_id."""
         return self._ref_task[task]
 
-    def con_map(self, con: str) -> int:
-        """Return con_id"""
+    def fsl_con_map(self, con: str) -> int:
+        """Return fsl_con_id"""
         return self._ref_con[con]
 
     def emo_label(self, row, row_name) -> int:
@@ -229,9 +224,9 @@ def db_update(
     km = _KeyMap(db_con)
     df["subj_id"] = km.subj_map(subj, proj_name)
     df["sess_id"] = km.sess_map(sess)
-    df["task_id"] = km.task_map(task_name)
-    df["model_id"] = km.model_map(model_name)
-    df["con_id"] = km.con_map(con_name)
+    df["fsl_task_id"] = km.fsl_task_map(task_name)
+    df["fsl_model_id"] = km.fsl_model_map(model_name)
+    df["fsl_con_id"] = km.fsl_con_map(con_name)
     df["mask_id"] = km.mask_map(mask_name, mask_sig)
 
     # Replace alpha emo with key value
@@ -241,7 +236,7 @@ def db_update(
     sql_cmd = (
         "select column_name from information_schema.columns "
         + "where table_schema='db_emorep' "
-        + f"and table_name='{_tbl_name(proj_name)}'"
+        + f"and table_name='tbl_dotprod_{proj_name}'"
     )
     rows = db_con.fetch_rows(sql_cmd)
     col_list = [x[0] for x in rows]
@@ -250,8 +245,23 @@ def db_update(
 
     # Built sql_cmd, update db
     sql_cmd = (
-        f"insert ignore into {_tbl_name(proj_name)} ({', '.join(col_list)}) "
+        f"insert ignore into tbl_dotprod_{proj_name} ({', '.join(col_list)}) "
         + f"values ({', '.join(val_list)})"
     )
     db_con.exec_many(sql_cmd, tbl_input)
     db_con.close_con()
+
+
+def get_sess_name(subj: str, sess: str) -> str:
+    """Determine session task name."""
+    db_con = DbConnect()
+    km = _KeyMap(db_con)
+    sql_cmd = (
+        "select b.task_name from ref_sess_task a "
+        + "join ref_task b on a.task_id = b.task_id "
+        + f"where a.subj_id = {km.subj_map(subj, 'emorep')} "
+        + f"and a.sess_id = {km.sess_map(sess)}"
+    )
+    rows = db_con.fetch_rows(sql_cmd)
+    db_con.close_con()
+    return rows[0][0]
