@@ -1,6 +1,7 @@
 """Methods for sending data to mysql database db_emorep.
 
 DbConnect : connect to and interact with db_emorep on mysql server
+db_check : check for existing data in db_emorep.tbl_dotprod_*
 db_update : update db_emorep.tbl_dotprod_*
 
 """
@@ -205,6 +206,26 @@ class _KeyMap:
         for emo_name, emo_id in self._ref_emo.items():
             if row[row_name] == emo_name:
                 return emo_id
+
+
+def db_check(subj: str, sess: str, proj_name: str, task_name: str) -> bool:
+    """Check if tbl_dotprod already has subj, sess, task data."""
+    db_con = DbConnect()
+    km = _KeyMap(db_con)
+
+    # TODO add support for checking fsl_con_id, fsl_model_id, mask_id
+    subj_id = km.subj_map(subj, proj_name)
+    sess_id = km.sess_map(sess)
+    fsl_task_id = km.fsl_task_map(task_name)
+    sql_cmd = (
+        f"select * from tbl_dotprod_{proj_name} "
+        + f"where subj_id={subj_id} and sess_id={sess_id} "
+        + f"and fsl_task_id={fsl_task_id} "
+        + "limit 1"
+    )
+    rows = db_con.fetch_rows(sql_cmd)
+    db_con.close_con()
+    return True if rows else False
 
 
 def db_update(

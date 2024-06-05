@@ -26,13 +26,6 @@ classify_rest \
     --mask-sig
 
 classify_rest \
-    -p emorep \
-    -e ses-day2 ses-day3 \
-    -s sub-ER0016 \
-    --task-name match \
-    --mask-sig
-
-classify_rest \
     -p archival \
     -e ses-BAS1 \
     -s sub-08326 sub-08399 \
@@ -106,11 +99,11 @@ def _get_args():
     parser.add_argument(
         "--task-name",
         choices=["movies", "scenarios", "both", "match"],
-        default="movies",
+        default="match",
         help=textwrap.dedent(
             """\
             Classifier name (informs which data classifier was trained
-            on). 'match' to use movie classifier on move sessions
+            on). 'match' to use movie classifier on movie sessions
             and scenario classifier on scenario sessions.
             Parameter 'both' is not currently supported.
             (default : %(default)s)

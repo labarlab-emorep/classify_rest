@@ -188,6 +188,17 @@ class ClassRest:
 
     def label_vols(self):
         """Compute dot product and label each volume."""
+        # Check for existing data in db_emorep.tbl_dotprod
+        if sql_database.db_check(
+            self._subj, self._sess, self._proj_name, self._task_name
+        ):
+            print(
+                f"Data found in db_emorep.tbl_dotprod_{self._proj_name} "
+                + f"for {self._subj}, {self._sess}, {self._task_name}. "
+                + "Skipping ..."
+            )
+            return
+
         # Run setup
         out_dir = os.path.join(
             self._work_deriv, self._subj, self._sess, "func"
