@@ -1,7 +1,6 @@
 #!/bin/bash
 
-#SBATCH --output ${LOG_DIR}/slurm_%A_%a.log
-#SBATCH --array=0-${ARRAY_NUM}%8
+#SBATCH --job-name=array
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=6G
 
@@ -12,8 +11,7 @@ function Usage {
     Submit array of jobs to compute resting state dot products.
 
     Notes:
-        - Exporting logging output directory (LOG_DIR),
-            array max N (ARRAY_NUM) required
+        - Exporting logging output directory (LOG_DIR) required
 
     Required Arguments:
         -e [ses-day2|ses-day3|ses-BAS1]
@@ -27,7 +25,8 @@ function Usage {
 
     Example Usage:
         sbatch \\
-            --export=LOG_DIR=/work/nmm51/EmoRep/logs/classify_rest_array,ARRAY_NUM=153 \\
+            --output=/work/$(whoami)/EmoRep/logs/classify_rest_array/slurm_%A_%a.log \\
+            --array=0-153%14 \\
             cli_array.sh \\
             -e ses-day2 \\
             -t match

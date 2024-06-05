@@ -254,6 +254,7 @@ def db_update(
 
 def get_sess_name(subj: str, sess: str) -> str:
     """Determine session task name."""
+    # Get session task name from db_emorep
     db_con = DbConnect()
     km = _KeyMap(db_con)
     sql_cmd = (

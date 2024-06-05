@@ -44,6 +44,7 @@ classify_rest \
 # %%
 import os
 import sys
+import time
 import textwrap
 from datetime import datetime
 from argparse import ArgumentParser, RawTextHelpFormatter
@@ -222,6 +223,7 @@ def main():
                 log_dir,
                 mask_sig,
             )
+            time.sleep(3)
 
 
 if __name__ == "__main__":

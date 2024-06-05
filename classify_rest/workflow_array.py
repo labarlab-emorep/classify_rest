@@ -1,4 +1,4 @@
-#!/bin/env /hpc/group/labarlab/research_bin/conda_envs/emorep/bin/python
+#!/bin/env /hpc/group/labarlab/research_bin/miniconda3/envs/dev-nate_emorep/bin/python
 """
 Submit classify_rest workflow for subject from scheduled array.
 
@@ -39,7 +39,7 @@ def _get_args():
         dest="task",
         choices=["movies", "scenarios", "both", "match"],
         type=str,
-        help="FSL task name",
+        help="Dot product type",
         required=True,
     )
 

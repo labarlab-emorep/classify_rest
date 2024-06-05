@@ -21,7 +21,11 @@ def submit_subprocess(
 ) -> Tuple:
     """Submit bash as subprocess."""
     job_sp = subprocess.Popen(
-        job_cmd, shell=True, stdout=subprocess.PIPE, env=env_input
+        job_cmd,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env_input,
     )
     job_out, job_err = job_sp.communicate()
     if wait:
