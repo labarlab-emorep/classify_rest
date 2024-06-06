@@ -105,7 +105,6 @@ def _get_args():
             Classifier name (informs which data classifier was trained
             on). 'match' to use movie classifier on movie sessions
             and scenario classifier on scenario sessions.
-            Parameter 'both' is not currently supported.
             (default : %(default)s)
             """
         ),
@@ -162,9 +161,6 @@ def main():
     no_setup = args.no_setup
 
     # Check arguments
-    if task_name == "both":
-        print("'--class-name both' not currently supported")
-        sys.exit(0)
     helper.check_rsa()
     helper.check_afni()
     helper.check_sql_pass()

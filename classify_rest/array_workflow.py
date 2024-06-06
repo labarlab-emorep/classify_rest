@@ -1,14 +1,16 @@
 #!/bin/env /hpc/group/labarlab/research_bin/miniconda3/envs/dev-nate_emorep/bin/python
+# TODO update interpreter for project environment
 """
 Submit classify_rest workflow for subject from scheduled array.
 
-Notes:
-    - Intended to be submitted from cli_array.sh
-    - task="both" not currently supported
+Notes
+-----
+- Intended to be submitted by cli_array.sh
+- Assumes output from workflow.wf_setup already exists
 
 Example
 -------
-python workflow_array.py -e ses-day2 -t match
+python array_workflow.py -e ses-day2 -t match
 
 """
 
@@ -56,17 +58,15 @@ def main():
     args = _get_args().parse_args()
     sess = args.sess
     task_name = args.task
-    if task_name == "both":
-        print("'--task-name both' not currently supported")
-        sys.exit(0)
 
     # Specify subjects for sbatch array, len(subj_list) should
     # match --array of submit_array.sh
     db_con = DbConnect()
-    subj_list = [
-        f"sub-{x[0]}"
-        for x in db_con.fetch_rows("select subj_name from ref_subj")
-    ]
+    query = (
+        "select distinct subj_name from ref_subj a "
+        + "join tbl_rest_ratings b on a.subj_id=b.subj_id"
+    )
+    subj_list = [f"sub-{x[0]}" for x in db_con.fetch_rows(query)]
     db_con.close_con()
 
     # Identify subject
@@ -74,7 +74,7 @@ def main():
     subj = subj_list[idx]
 
     # Setup required args
-    # TODO support other model names, masks, contrast names
+    # TODO support other model, masks, contrast names
     proj_name = "emorep"
     mask_name = "tpl_GM_mask.nii.gz"
     model_name = "sep"

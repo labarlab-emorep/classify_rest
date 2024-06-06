@@ -1,6 +1,7 @@
 #!/bin/bash
 
 #SBATCH --job-name=array
+#SBATCH --time=12:00:00
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=6G
 
@@ -16,18 +17,21 @@ function Usage {
     Required Arguments:
         -e [ses-day2|ses-day3|ses-BAS1]
             BIDS session identifier
-        -t [movies|scenarios|match]
+        -t [movies|scenarios|both|match]
             Method of matching classifer type (movies|scenarios)
             to session resting data.
-            - "-t match": align classifer type to session type
             - "-t movies": use movie classifer for session, regardless
                 of session task
+            - "-t scenarios": similar to "-t movies"
+            - "-t both": use classifer trained on movies+scenarios
+            - "-t match": align classifer type to session type
+
 
     Example Usage:
         sbatch \\
             --output=/work/$(whoami)/EmoRep/logs/classify_rest_array/slurm_%A_%a.log \\
             --array=0-153%14 \\
-            cli_array.sh \\
+            array_cli.sh \\
             -e ses-day2 \\
             -t match
 
@@ -72,4 +76,4 @@ if [ -z $sess ] || [ -z $task ]; then
     exit 1
 fi
 
-python workflow_array.py -e $sess -t $task
+python array_workflow.py -e $sess -t $task
