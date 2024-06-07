@@ -210,9 +210,15 @@ class _KeyMap:
 
 def db_check(subj: str, sess: str, proj_name: str, task_name: str) -> bool:
     """Check if tbl_dotprod already has subj, sess, task data."""
+    # Validate task_name
+    if task_name not in ["movies", "scenarios", "both"]:
+        raise ValueError(f"Unexpected task_name : {task_name}")
+
+    # Connect, get helper
     db_con = DbConnect()
     km = _KeyMap(db_con)
 
+    # Check if data exists in db_emorep.tbl_dotprod_*
     # TODO add support for checking fsl_con_id, fsl_model_id, mask_id
     subj_id = km.subj_map(subj, proj_name)
     sess_id = km.sess_map(sess)
