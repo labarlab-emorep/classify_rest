@@ -18,14 +18,11 @@ function Usage {
         -e [ses-day2|ses-day3|ses-BAS1]
             BIDS session identifier
         -t [movies|scenarios|both|match]
-            Method of matching classifer type (movies|scenarios)
-            to session resting data.
-            - "-t movies": use movie classifer for session, regardless
-                of session task
-            - "-t scenarios": similar to "-t movies"
-            - "-t both": use classifer trained on movies+scenarios
-            - "-t match": align classifer type to session type
-
+            Classifier type for dot product computation
+            - movies: use movie classifer
+            - scenarios: use movie classifer
+            - both: use classifer trained on movies+scenarios
+            - match: align classifer type to session task
 
     Example Usage:
         sbatch \\
