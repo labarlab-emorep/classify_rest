@@ -16,6 +16,7 @@ Notes
 - Options contrast-name, model-name, and task-name are used
     to idenfity the classifier (and reflect which data the
     classifier was trained on).
+- Requires func_model version >=4.3.1
 
 Examples
 --------
