@@ -12,7 +12,7 @@ from typing import Union
 from classify_rest import helper
 from classify_rest import process
 from classify_rest import sql_database
-from func_model.resources.fsl import group as fsl_group
+from func_model.resources import group
 
 
 # %%
@@ -64,7 +64,7 @@ def wf_setup(
     mask_path = ds.dl_gm_mask(mask_name)
 
     # Determine MNI coordinate from mask, get emotion list
-    mk_mask = fsl_group.ImportanceMask(mask_path)
+    mk_mask = group.ImportanceMask(mask_path)
     emo_list = mk_mask.emo_names()
 
     def _build_mask(
@@ -188,6 +188,17 @@ class ClassRest:
 
     def label_vols(self):
         """Compute dot product and label each volume."""
+        # Check for existing data in db_emorep.tbl_dotprod
+        if sql_database.db_check(
+            self._subj, self._sess, self._proj_name, self._task_name
+        ):
+            print(
+                f"Data found in db_emorep.tbl_dotprod_{self._proj_name} "
+                + f"for {self._subj}, {self._sess}, {self._task_name}. "
+                + "Skipping ..."
+            )
+            return
+
         # Run setup
         out_dir = os.path.join(
             self._work_deriv, self._subj, self._sess, "func"

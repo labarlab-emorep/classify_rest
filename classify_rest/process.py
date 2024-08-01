@@ -8,6 +8,7 @@ DoDot : compute dot product between classifier weight matrix and
 
 import os
 import glob
+import time
 from typing import Union
 from multiprocessing import Process
 import pandas as pd
@@ -32,6 +33,8 @@ def _read_line(in_file: Union[str, os.PathLike]) -> str:
     """Return line value of in_file."""
     with open(in_file, "r") as in_f:
         line_val = in_f.readline()
+    if not line_val:
+        raise ValueError(f"Empty file : {in_file}")
     return line_val
 
 
@@ -69,9 +72,13 @@ class _CalcZscore:
         if os.path.exists(out_path):
             return
 
-        # Conduct calculation
+        # Calculate mean, std, check for values
         vol_mean = self._mean()
         vol_std = self._std()
+        if not vol_mean or not vol_std:
+            raise ValueError("Error calculating mean, std")
+
+        # Calculate zscore
         cmd_list = [
             "3dcalc",
             f"-a '{self._res_path}[{self._vol}]'",
@@ -109,6 +116,7 @@ class _CalcZscore:
         """Run bash command and extract AFNI stdout."""
         bash_cmd = " ".join(self._prepend_afni() + cmd_list)
         submit.submit_subprocess(bash_cmd)
+        time.sleep(3)  # wait for singularity to close
         out_csv = out_txt.replace(".txt", ".csv")
         _clean_afni_stdout(out_txt, out_csv)
         return _read_line(out_csv)
@@ -212,12 +220,12 @@ def _calc_dot(
         if not os.path.exists(bin_path):
             raise FileNotFoundError(f"Expected binary mask : {bin_path}")
         bin_out = os.path.join(
-            subj_deriv, "tmp_mlt_" + os.path.basename(bin_path)
+            subj_deriv, "tmp_mlt-" + os.path.basename(bin_path)
         )
         if os.path.exists(bin_out):
             return bin_out
 
-        # Conduct mask * binary mult, check for output
+        # Conduct mask * binary mult
         mult_list = [
             "3dcalc",
             f"-a {mask_path}",
@@ -227,6 +235,9 @@ def _calc_dot(
         ]
         bash_cmd = " ".join(_prepend_afni() + mult_list)
         submit.submit_subprocess(bash_cmd)
+
+        # Check for output
+        time.sleep(3)  # wait for singularity to close
         if not os.path.exists(bin_out):
             raise FileNotFoundError(
                 f"Missing ROI-binary intersection mask : {bin_out}"
@@ -246,12 +257,16 @@ def _calc_dot(
             f">> {out_txt}",
         ]
         bash_cmd = " ".join(_prepend_afni() + dot_list)
-        print(bash_cmd)
         submit.submit_subprocess(bash_cmd)
 
     # Clean txt file of singularity verbiage, write csv
     out_csv = out_txt.replace(".txt", ".csv")
     _clean_afni_stdout(out_txt, out_csv)
+
+    # Check line number of cleaned csv
+    num_lines = sum(1 for _ in open(out_csv))
+    if num_lines != len(res_vols):
+        raise ValueError(f"Did not find {len(res_vols)} lines in : {out_csv}")
 
 
 # %%

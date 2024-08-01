@@ -21,7 +21,11 @@ def submit_subprocess(
 ) -> Tuple:
     """Submit bash as subprocess."""
     job_sp = subprocess.Popen(
-        job_cmd, shell=True, stdout=subprocess.PIPE, env=env_input
+        job_cmd,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env_input,
     )
     job_out, job_err = job_sp.communicate()
     if wait:
@@ -176,6 +180,7 @@ def sched_zscore(
 
         #SBATCH --output={log_dir}/zscore_{subj}_{sess}_%a.txt
         #SBATCH --array=0-{num_vols - 1}%10
+        #SBATCH --time=01:00:00
         #SBATCH --wait
 
         from classify_rest import process
