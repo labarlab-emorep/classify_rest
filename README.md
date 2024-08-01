@@ -1,12 +1,6 @@
 # classify_rest
 This package calculates the dot product of rsfMRI data and classifier feature weights, used for both the EmoRep and NKI Archival data. It is written for execution on the Duke Computer Cluster, and will find required data on both Keoki and the MySQL databse `db_emorep`.
 
-Contents:
-* [Setup](#setup)
-* [Usage](#usage)
-* [Functionality](#functionality)
-* [Considerations](#considerations)
-
 
 ## Setup
 * Install into project environment on the Duke Compute Cluster (DCC; see [here](https://github.com/labarlab/conda_dcc)) via `$python setup.py install`.
@@ -23,10 +17,9 @@ The CLI supplies a number of parameters (as well as their corresponding default 
 
 ```
 (emorep)[nmm51-dcc: emorep]$classify_rest
-usage: classify_rest [-h] [--contrast-name {stim,replay,tog}] [--mask-name {tpl_GM_mask.nii.gz}]
-                     [--mask-sig] [--model-name {sep,tog}] [--no-setup]
-                     [--task-name {movies,scenarios,both,match}] -e {ses-day2,ses-day3,ses-BAS1}
-                     [{ses-day2,ses-day3,ses-BAS1} ...] -p {emorep,archival} -s SUB_LIST
+usage: classify_rest [-h] [--contrast-name {stim,replay,tog}] [--mask-name {tpl_GM_mask.nii.gz}] [--mask-sig]
+                     [--model-name {sep,tog}] [--no-setup] [--task-name {movies,scenarios,both,match}] -e
+                     {ses-day2,ses-day3,ses-BAS1} [{ses-day2,ses-day3,ses-BAS1} ...] -p {emorep,archival} -s SUB_LIST
                      [SUB_LIST ...]
 
 Version : 1.3.1
@@ -49,6 +42,7 @@ Notes
 - Options contrast-name, model-name, and task-name are used
     to idenfity the classifier (and reflect which data the
     classifier was trained on).
+- Requires func_model version >=4.3.1
 
 Examples
 --------
