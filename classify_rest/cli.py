@@ -67,8 +67,8 @@ def _get_args():
     )
     parser.add_argument(
         "--mask-name",
-        choices=["tpl_GM_mask.nii.gz"],
-        default="tpl_GM_mask.nii.gz",
+        choices=["tpl_GM_mask.nii.gz", "tpl_template-whole_GM_mask.nii.gz"],
+        default="tpl_template-whole_GM_mask.nii.gz",
         help=textwrap.dedent(
             """\
             Select template mask
