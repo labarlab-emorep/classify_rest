@@ -122,7 +122,7 @@ class ClassRest:
         {"emorep", "archival"}
         Project name
     mask_name : str
-        {"tpl_GM_mask.nii.gz"}
+        {"tpl_template-whole_GM_mask.nii.gz"}
         File name of mask used in beta extraction
     model_name : str
         {"sep", "tog"}
