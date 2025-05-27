@@ -39,7 +39,7 @@ def wf_setup(
     work_deriv : str, os.PathLike
         Location of output parent directory
     mask_name : str
-        {"tpl_GM_mask.nii.gz"}
+        {"tpl_template-whole_GM_mask.nii.gz"}
         File name of mask used in beta extraction
     model_name : str
         {"sep", "tog"}
@@ -122,7 +122,7 @@ class ClassRest:
         {"emorep", "archival"}
         Project name
     mask_name : str
-        {"tpl_GM_mask.nii.gz"}
+        {"tpl_template-whole_GM_mask.nii.gz"}
         File name of mask used in beta extraction
     model_name : str
         {"sep", "tog"}
@@ -188,16 +188,16 @@ class ClassRest:
 
     def label_vols(self):
         """Compute dot product and label each volume."""
-        # Check for existing data in db_emorep.tbl_dotprod
-        if sql_database.db_check(
-            self._subj, self._sess, self._proj_name, self._task_name
-        ):
-            print(
-                f"Data found in db_emorep.tbl_dotprod_{self._proj_name} "
-                + f"for {self._subj}, {self._sess}, {self._task_name}. "
-                + "Skipping ..."
-            )
-            return
+        # # Check for existing data in db_emorep.tbl_dotprod
+        # if sql_database.db_check(
+        #     self._subj, self._sess, self._proj_name, self._task_name
+        # ):
+        #     print(
+        #         f"Data found in db_emorep.tbl_dotprod_{self._proj_name} "
+        #         + f"for {self._subj}, {self._sess}, {self._task_name}. "
+        #         + "Skipping ..."
+        #     )
+        #     return
 
         # Run setup
         out_dir = os.path.join(
