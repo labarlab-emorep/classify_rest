@@ -75,7 +75,7 @@ def main():
     # Setup required args
     # TODO support other model, masks, contrast names
     proj_name = "emorep"
-    mask_name = "tpl_GM_mask.nii.gz"
+    mask_name = "tpl_template-whole_GM_mask.nii.gz"
     model_name = "sep"
     con_name = "stim"
     work_deriv = f"/work/{os.environ['USER']}/EmoRep/classify_rest"
