@@ -74,7 +74,7 @@ def wf_setup(
         out_path = os.path.join(
             work_deriv,
             f"{mask_type}_model-{model_name}_task-{class_name}_"
-            + f"con-{con_name}_emo-{emo_name}_map.nii.gz",
+            + f"con-{con_name}_emo-{emo_name}_tpl-whole_map.nii.gz",
         )
         if os.path.exists(out_path):
             return out_path
@@ -264,7 +264,7 @@ class ClassRest:
         self._mask_path = os.path.join(self._work_deriv, self._mask_name)
         map_str = (
             f"importance_model-{self._model_name}_task-{self._task_name}_"
-            + f"con-{self._con_name}_emo-*_map.nii.gz"
+            + f"con-{self._con_name}_emo-*_tpl-whole_map.nii.gz"
         )
         self._weight_maps = sorted(glob.glob(f"{self._work_deriv}/{map_str}"))
         if not self._weight_maps or not os.path.exists(self._mask_path):
