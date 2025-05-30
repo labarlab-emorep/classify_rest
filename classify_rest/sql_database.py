@@ -270,10 +270,14 @@ def db_update(
     val_list = ["%s" for x in col_list]
     tbl_input = list(df[col_list].itertuples(index=False, name=None))
 
+    emo_cols = [x for x in col_list if "emo_" in x] + ["label_max"]
+    cols = [f"{x}=values({x})" for x in emo_cols]
+    
     # Built sql_cmd, update db
     sql_cmd = (
-        f"insert ignore into tbl_dotprod_{proj_name} ({', '.join(col_list)}) "
+        f"insert into tbl_dotprod_{proj_name} ({', '.join(col_list)}) "
         + f"values ({', '.join(val_list)})"
+        + f" on duplicate key update ({', '.join(cols)})"
     )
     db_con.exec_many(sql_cmd, tbl_input)
     db_con.close_con()
