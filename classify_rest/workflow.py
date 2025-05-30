@@ -79,7 +79,7 @@ def wf_setup(
         if os.path.exists(out_path):
             return out_path
         return mk_mask.sql_masks(
-            class_name, model_name, con_name, emo_name, mask_type, work_deriv
+            class_name, model_name, con_name, emo_name, mask_type, "whole", work_deriv
         )
 
     def _org_build(mask_type: str) -> Union[list, str, os.PathLike]:
