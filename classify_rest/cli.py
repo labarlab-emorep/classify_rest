@@ -24,6 +24,7 @@ classify_rest \
     -p emorep \
     -e ses-day2 ses-day3 \
     -s sub-ER0016 \
+    --mask-name tpl_template-whole_GM_mask.nii.gz \
     --mask-sig
 
 classify_rest \
@@ -67,7 +68,7 @@ def _get_args():
     )
     parser.add_argument(
         "--mask-name",
-        choices=["tpl_GM_mask.nii.gz"],
+        choices=["tpl_GM_mask.nii.gz", "tpl_template-whole_GM_mask.nii.gz"],
         default="tpl_GM_mask.nii.gz",
         help=textwrap.dedent(
             """\
@@ -184,6 +185,18 @@ def main():
         if not os.path.exists(chk_dir):
             os.makedirs(chk_dir)
 
+    # Add support for mask names including tpl_GM_mask,
+    # tpl_template-cortex_*_mask and tpl_template-whole_*_mask.
+    # TODO: func_model.resource.group.ImportanceMasks.sql_masks only supports
+    #       "whole" and "cortex" as input, will break for visual, limbic, etc.
+    # TODO: also relevant for extracting data from tbl_plsda_importance_*.
+    # TODO: if tpl_GM_mask is used, will reference ref_voxel_gm_whole (the
+    #       wrong table). Consider deprecating tpl_GM_mask.
+    _mask = mask_name.split("tpl_")[1].split("_mask")[0]
+    clf_tpl = (
+        _mask.split("-")[1].split("_")[0] if "template" in _mask else "whole"
+    )
+
     # Download classifier weights and mask
     if not no_setup:
         submit.sched_setup(
@@ -193,9 +206,13 @@ def main():
             model_name,
             task_name,
             con_name,
+            clf_tpl,
             log_dir,
             mask_sig,
         )
+
+    # TODO: remove after testing wf_setup.
+    return
 
     # Conduct workflow for each subject, session
     print("Submitting workflow ...")
@@ -209,6 +226,7 @@ def main():
                 model_name,
                 task_name,
                 con_name,
+                clf_tpl,
                 work_deriv,
                 log_dir,
                 mask_sig,

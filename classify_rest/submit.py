@@ -72,6 +72,7 @@ def sched_setup(
     model_name: str,
     task_name: str,
     con_name: str,
+    clf_tpl: str,
     log_dir: Union[str, os.PathLike],
     mask_sig: bool,
 ):
@@ -104,6 +105,7 @@ def sched_setup(
             "{model_name}",
             "{task_name}",
             "{con_name}",
+            "{clf_tpl}",
             "{log_dir}",
             {mask_sig},
         )
@@ -124,6 +126,7 @@ def sched_workflow(
     model_name: str,
     task_name: str,
     con_name: str,
+    clf_tpl: str,
     work_deriv: Union[str, os.PathLike],
     log_dir: Union[str, os.PathLike],
     mask_sig: bool,
@@ -148,6 +151,7 @@ def sched_workflow(
             "{model_name}",
             "{task_name}",
             "{con_name}",
+            "{clf_tpl}",
             "{work_deriv}",
             "{log_dir}",
             {mask_sig},
@@ -206,7 +210,7 @@ def sched_dotprod(
     weight_path: Union[str, os.PathLike],
     subj_deriv: Union[str, os.PathLike],
     log_dir: Union[str, os.PathLike],
-    mask_sig: bool,
+    # mask_sig: bool,
 ):
     """Schedule process._DotProd."""
     subj = subj_deriv.split("sub-")[1].split("/")[0]
@@ -229,7 +233,6 @@ def sched_dotprod(
             "{weight_path}",
             "{mask_path}",
             "{subj_deriv}",
-            {mask_sig},
         )
 
     """

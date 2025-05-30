@@ -150,9 +150,13 @@ class _KeyMap:
             x[1]: x[0]
             for x in self._db_con.fetch_rows("select * from ref_sess")
         }
-        self._ref_mask = {
+        # self._ref_mask = {
+        #     x[1]: x[0]
+        #     for x in self._db_con.fetch_rows("select * from ref_mask")
+        # }
+        self._ref_tpl = {
             x[1]: x[0]
-            for x in self._db_con.fetch_rows("select * from ref_mask")
+            for x in self._db_con.fetch_rows("select * from ref_tpl")
         }
         self._ref_model = {
             x[1]: x[0]
@@ -184,10 +188,19 @@ class _KeyMap:
         return self._ref_sess[sess_low]
 
     def mask_map(self, mask: str, mask_sig: bool) -> int:
-        """Return mask_id."""
+        """Return mask_id.
+
+        Deprecated.
+
+        """
+        return
         if mask_sig:
             return self._ref_mask["Sig Voxel"]
         return self._ref_mask["GM"]
+
+    def mask_tpl(self, clf_tpl: str) -> int:
+        """Return tpl_id."""
+        return self._ref_tpl[clf_tpl]
 
     def fsl_model_map(self, model: str) -> int:
         """Return fsl_model_id."""
@@ -243,7 +256,8 @@ def db_update(
     model_name: str,
     task_name: str,
     con_name: str,
-    mask_sig: bool,
+    clf_tpl: str,
+    # mask_sig: bool,
 ) -> list:
     """Make df compliant with db_emorep, return list of tuples."""
     # Add foreign key columns
@@ -254,7 +268,8 @@ def db_update(
     df["fsl_task_id"] = km.fsl_task_map(task_name)
     df["fsl_model_id"] = km.fsl_model_map(model_name)
     df["fsl_con_id"] = km.fsl_con_map(con_name)
-    df["mask_id"] = km.mask_map(mask_name, mask_sig)
+    # df["mask_id"] = km.mask_map(mask_name, mask_sig)
+    df["mask_id"] = km.mask_tpl(clf_tpl)
 
     # Replace alpha emo with key value
     df["label_max"] = df.apply(lambda x: km.emo_label(x, "label_max"), axis=1)

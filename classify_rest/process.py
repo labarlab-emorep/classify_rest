@@ -188,7 +188,7 @@ def _calc_dot(
     weight_path: Union[str, os.PathLike],
     mask_path: Union[str, os.PathLike],
     subj_deriv: Union[str, os.PathLike],
-    mask_sig: bool,
+    # mask_sig: bool,
 ):
     """Calculate dot products.
 
@@ -244,8 +244,8 @@ def _calc_dot(
             )
         return bin_out
 
-    # Multiply ROI (template GM) mask by binary classifier mask
-    mask_path = _mult_mask() if mask_sig else mask_path
+    # # Multiply ROI (template GM) mask by binary classifier mask
+    # mask_path = _mult_mask() if mask_sig else mask_path
 
     # Calc dot product for each volume
     for vol, res_path in res_vols.items():
@@ -323,7 +323,7 @@ class DoDot:
         self,
         weight_maps: list,
         log_dir: Union[str, os.PathLike],
-        mask_sig: bool,
+        # mask_sig: bool,
     ):
         """Compute dot product of each weight map in parallel."""
 
@@ -342,7 +342,7 @@ class DoDot:
                     weight_path,
                     self._subj_deriv,
                     log_dir,
-                    mask_sig,
+                    # mask_sig,
                 ),
             )
             for weight_path in weight_maps

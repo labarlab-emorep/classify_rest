@@ -14,6 +14,8 @@ from classify_rest import process
 from classify_rest import sql_database
 from func_model.resources import group
 
+log = helper.MakeLogger(os.path.basename(__file__))
+
 
 # %%
 def wf_setup(
@@ -23,6 +25,7 @@ def wf_setup(
     model_name,
     task_name,
     con_name,
+    clf_tpl,
     log_dir,
     mask_sig,
 ):
@@ -39,7 +42,7 @@ def wf_setup(
     work_deriv : str, os.PathLike
         Location of output parent directory
     mask_name : str
-        {"tpl_GM_mask.nii.gz"}
+        {"tpl_GM_mask.nii.gz", "tpl_template-whole_GM_mask.nii.gz"}
         File name of mask used in beta extraction
     model_name : str
         {"sep", "tog"}
@@ -51,19 +54,25 @@ def wf_setup(
     con_name : str
         {"stim", "replay", "tog"}
         Contrast name (e.g. stimWashout) from first-level models
+    clf_tpl : str
+        {"whole", "cortex"}
+        The template used for classification
     log_dir : str, os.PathLike
         Location of output directory for logging
     mask_sig : bool
         Whether to compute dotprod on signficant voxels
 
     """
-    print("Running workflow.wf_setup ...")
+    # print("Running workflow.wf_setup ...")
+    log.write.info("Running workflow.wf_setup ...")
 
     # Download required files from Keoki
+    log.write.info("Downloading mask")
     ds = helper.DataSync(proj_name, work_deriv)
     mask_path = ds.dl_gm_mask(mask_name)
 
     # Determine MNI coordinate from mask, get emotion list
+    log.write.info("Building importance mask")
     mk_mask = group.ImportanceMask(mask_path)
     emo_list = mk_mask.emo_names()
 
@@ -74,12 +83,19 @@ def wf_setup(
         out_path = os.path.join(
             work_deriv,
             f"{mask_type}_model-{model_name}_task-{class_name}_"
-            + f"con-{con_name}_emo-{emo_name}_map.nii.gz",
+            + f"con-{con_name}_emo-{emo_name}_tpl-{clf_tpl}_map.nii.gz",
         )
+        log.write.info(f"Making map: {out_path}")
         if os.path.exists(out_path):
             return out_path
         return mk_mask.sql_masks(
-            class_name, model_name, con_name, emo_name, mask_type, work_deriv
+            class_name,
+            model_name,
+            con_name,
+            emo_name,
+            mask_type,
+            clf_tpl,
+            work_deriv,
         )
 
     def _org_build(mask_type: str) -> Union[list, str, os.PathLike]:
@@ -96,9 +112,17 @@ def wf_setup(
     for emo_name in emo_list:
 
         # Make mask for voxels importance, significance
-        _ = _org_build("importance")
+        mask_map_imp = _org_build("importance")
         if mask_sig:
-            _ = _org_build("binary")
+            mask_map_bin = _org_build("binary")
+
+        # Validate mask map construction
+        if not os.path.exists(mask_map_imp):
+            log.write.error(f"Failed to locate: {mask_map_imp}")
+            raise FileNotFoundError(mask_map_imp)
+        if mask_sig and not os.path.exists(mask_map_bin):
+            log.write.error(f"Failed to locate: {mask_map_bin}")
+            raise FileNotFoundError(mask_map_bin)
 
 
 class ClassRest:
@@ -122,7 +146,7 @@ class ClassRest:
         {"emorep", "archival"}
         Project name
     mask_name : str
-        {"tpl_GM_mask.nii.gz"}
+        {"tpl_GM_mask.nii.gz", "tpl_template-whole_GM_mask.nii.gz"}
         File name of mask used in beta extraction
     model_name : str
         {"sep", "tog"}
@@ -134,11 +158,15 @@ class ClassRest:
     con_name : str
         {"stim", "replay", "tog"}
         Contrast name (e.g. stimWashout) from first-level models
+    clf_tpl : str
+        {"whole", "cortex"}
+        The template used for classification
     work_deriv : str, os.PathLike
         Location of output parent directory
     log_dir : str, os.PathLike
         Location of output directory for logging
     mask_sig : bool
+        Deprecated.
         Whether to compute dotprod on signficant voxels
 
     Methods
@@ -162,11 +190,13 @@ class ClassRest:
         model_name,
         task_name,
         con_name,
+        clf_tpl,
         work_deriv,
         log_dir,
-        mask_sig,
+        # mask_sig,
     ):
         """Initialize."""
+        log.write.info("Initiating ClassRest")
         self._subj = subj
         self._sess = sess
         self._proj_name = proj_name
@@ -180,7 +210,7 @@ class ClassRest:
         self._con_name = con_name
         self._work_deriv = work_deriv
         self._log_dir = log_dir
-        self._mask_sig = mask_sig
+        # self._mask_sig = mask_sig
 
         # Check options and get data sync object
         helper.check_proj_sess(proj_name, [sess])
@@ -188,6 +218,7 @@ class ClassRest:
 
     def label_vols(self):
         """Compute dot product and label each volume."""
+        log.write.info("Starting label_vols")
         # Check for existing data in db_emorep.tbl_dotprod
         if sql_database.db_check(
             self._subj, self._sess, self._proj_name, self._task_name
@@ -208,6 +239,7 @@ class ClassRest:
         self._setup()
 
         # Convert volume values to zscore and split
+        log.write.info("Starting zscore_vols workflow")
         res_vols = process.zscore_vols(
             self._res_path,
             self._mask_path,
@@ -216,11 +248,12 @@ class ClassRest:
         )
 
         # Conduct dot product calculations and volume label
+        log.write.info("Calculating dot products")
         do_dot = process.DoDot(res_vols, out_dir, self._mask_path)
         do_dot.calc_dot(
             self._weight_maps,
             self._log_dir,
-            self._mask_sig,
+            # self._mask_sig,
         )
         do_dot.label_vol()
         out_path = os.path.join(
@@ -253,6 +286,7 @@ class ClassRest:
 
     def _setup(self):
         """Download and check for required files."""
+        log.write.info("Running setup for label_vols")
         # Get cleaned resting data
         self._res_path = self._ds.dl_rest(self._subj, self._sess)
         if not os.path.exists(self._res_path):
