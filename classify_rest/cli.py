@@ -211,9 +211,6 @@ def main():
             mask_sig,
         )
 
-    # TODO: remove after testing wf_setup.
-    return
-
     # Conduct workflow for each subject, session
     print("Submitting workflow ...")
     for subj in subj_list:

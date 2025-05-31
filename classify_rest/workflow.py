@@ -75,11 +75,13 @@ def wf_setup(
     log.write.info("Building importance mask")
     mk_mask = group.ImportanceMask(mask_path)
     emo_list = mk_mask.emo_names()
+    log.write.debug(f"emo_list: {emo_list}")
 
     def _build_mask(
         class_name: str, mask_type: str
     ) -> Union[str, os.PathLike]:
         """Wrap mk_mask.sql_mask."""
+        # Set output name, avoid repeating work
         out_path = os.path.join(
             work_deriv,
             f"{mask_type}_model-{model_name}_task-{class_name}_"
@@ -88,7 +90,9 @@ def wf_setup(
         log.write.info(f"Making map: {out_path}")
         if os.path.exists(out_path):
             return out_path
-        return mk_mask.sql_masks(
+
+        # Make and verify mask
+        out_path = mk_mask.sql_masks(
             class_name,
             model_name,
             con_name,
@@ -97,6 +101,10 @@ def wf_setup(
             clf_tpl,
             work_deriv,
         )
+        if not os.path.exists(out_path):
+            log.write.error(f"Missing map: {out_path}")
+            raise FileNotFoundError(out_path)
+        return out_path
 
     def _org_build(mask_type: str) -> Union[list, str, os.PathLike]:
         """Determine which masks to build."""
@@ -108,21 +116,11 @@ def wf_setup(
         else:
             return _build_mask(task_name, mask_type)
 
-    # Make masks for each emotion classifier
+    # Make importance and significance masks for each emotion classifier
     for emo_name in emo_list:
-
-        # Make mask for voxels importance, significance
-        mask_map_imp = _org_build("importance")
+        _ = _org_build("importance")
         if mask_sig:
-            mask_map_bin = _org_build("binary")
-
-        # Validate mask map construction
-        if not os.path.exists(mask_map_imp):
-            log.write.error(f"Failed to locate: {mask_map_imp}")
-            raise FileNotFoundError(mask_map_imp)
-        if mask_sig and not os.path.exists(mask_map_bin):
-            log.write.error(f"Failed to locate: {mask_map_bin}")
-            raise FileNotFoundError(mask_map_bin)
+            _ = _org_build("binary")
 
 
 class ClassRest:
