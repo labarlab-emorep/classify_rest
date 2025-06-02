@@ -210,7 +210,7 @@ def sched_dotprod(
     weight_path: Union[str, os.PathLike],
     subj_deriv: Union[str, os.PathLike],
     log_dir: Union[str, os.PathLike],
-    # mask_sig: bool,
+    mask_sig: bool,
 ):
     """Schedule process._DotProd."""
     subj = subj_deriv.split("sub-")[1].split("/")[0]
@@ -233,6 +233,7 @@ def sched_dotprod(
             "{weight_path}",
             "{mask_path}",
             "{subj_deriv}",
+            {mask_sig},
         )
 
     """

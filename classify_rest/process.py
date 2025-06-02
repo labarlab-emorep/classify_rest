@@ -16,8 +16,9 @@ import nibabel as nib
 from classify_rest import helper
 from classify_rest import submit
 
+log = helper.MakeLogger(os.path.basename(__file__))
 
-# %%
+
 def _clean_afni_stdout(
     in_file: Union[str, os.PathLike], out_file: Union[str, os.PathLike]
 ):
@@ -38,7 +39,6 @@ def _read_line(in_file: Union[str, os.PathLike]) -> str:
     return line_val
 
 
-# %%
 class _CalcZscore:
     """Calculate and generate z-scored NIfTI for single volume.
 
@@ -57,7 +57,8 @@ class _CalcZscore:
         res_path: Union[str, os.PathLike],
         mask_path: Union[str, os.PathLike],
     ):
-        """Initialize."""
+        """Initialize _CalcZscore."""
+        log.write.info("Initializing _CalcZscore")
         self._subj_deriv = subj_deriv
         self._res_path = res_path
         self._mask_path = mask_path
@@ -65,14 +66,17 @@ class _CalcZscore:
 
     def zscore(self):
         """Compute z-score for volume."""
+        log.write.info("Starting zscore workflow")
         # Check for previous work
         out_path = os.path.join(
             self._subj_deriv, f"tmp_vol-{self._vol}_zscore.nii.gz"
         )
         if os.path.exists(out_path):
+            log.write.info(f"Found outfile: {out_path}")
             return
 
         # Calculate mean, std, check for values
+        log.write.info("Calculating zscore")
         vol_mean = self._mean()
         vol_std = self._std()
         if not vol_mean or not vol_std:
@@ -135,7 +139,6 @@ class _CalcZscore:
         ]
 
 
-# %%
 def zscore_vols(res_path, mask_path, subj_deriv, log_dir):
     """Convert each volume of rest EPI to z-scored NIfTI.
 
@@ -156,19 +159,33 @@ def zscore_vols(res_path, mask_path, subj_deriv, log_dir):
         {0: "/path/to/tmp_vol-0_zscore.nii.gz"}
         Volume number and path to file
 
+    Raises
+    ------
+    ValueError: mismatch between number of volumes and z-scored files.
+
     """
+    log.write.info("Calculating zscore for each volume ...")
+
     # Conduct z-scoring of volumes
     img = nib.load(res_path)
     num_vols = img.header.get_data_shape()[-1]
-    submit.sched_zscore(
-        num_vols,
-        res_path,
-        subj_deriv,
-        mask_path,
-        log_dir,
+    last_vol_path = os.path.join(
+        subj_deriv, f"tmp_vol-{num_vols-1}_zscore.nii.gz"
     )
+    if not os.path.exists(
+        last_vol_path
+    ):  # avoid scheduling array of unneeded jobs
+        log.write.info(f"Did not detect {last_vol_path}, starting zscore wf.")
+        submit.sched_zscore(
+            num_vols,
+            res_path,
+            subj_deriv,
+            mask_path,
+            log_dir,
+        )
 
     # Build out dict manually to ensure order
+    log.write.info("Building dict of z-scored volumes")
     res_vols = {}
     for vol in list(range(0, num_vols)):
         res_path = os.path.join(subj_deriv, f"tmp_vol-{vol}_zscore.nii.gz")
@@ -181,14 +198,13 @@ def zscore_vols(res_path, mask_path, subj_deriv, log_dir):
     return res_vols
 
 
-# %%
 def _calc_dot(
     res_vols: dict,
     emo_name: str,
     weight_path: Union[str, os.PathLike],
     mask_path: Union[str, os.PathLike],
     subj_deriv: Union[str, os.PathLike],
-    # mask_sig: bool,
+    mask_sig: bool,
 ):
     """Calculate dot products.
 
@@ -196,6 +212,7 @@ def _calc_dot(
     (indirectly via submit.sched_dotprod) by DoDot.
 
     """
+    log.write.info("Starting _calc_dot")
     # Start empty output file
     par_dir = os.path.dirname(mask_path)
     out_txt = os.path.join(subj_deriv, f"tmp_df_{emo_name}_weight.txt")
@@ -244,12 +261,12 @@ def _calc_dot(
             )
         return bin_out
 
-    # # Multiply ROI (template GM) mask by binary classifier mask
-    # mask_path = _mult_mask() if mask_sig else mask_path
+    # Multiply ROI (template GM) mask by binary classifier mask
+    mask_path = _mult_mask() if mask_sig else mask_path
 
     # Calc dot product for each volume
     for vol, res_path in res_vols.items():
-        print(f"Calculating dot product for volume : {vol}")
+        log.write.info(f"Calculating dot product for volume : {vol}")
         dot_list = [
             "3ddot",
             f"-mask {mask_path}",
@@ -269,7 +286,6 @@ def _calc_dot(
         raise ValueError(f"Did not find {len(res_vols)} lines in : {out_csv}")
 
 
-# %%
 class DoDot:
     """Conduct dot product calculations.
 
@@ -313,7 +329,8 @@ class DoDot:
     """
 
     def __init__(self, res_vols, subj_deriv, mask_path):
-        """Initialize."""
+        """Initialize DoDot."""
+        log.write.info("Initializing DoDot")
         helper.check_afni()
         self._res_vols = res_vols
         self._mask_path = mask_path
@@ -323,9 +340,10 @@ class DoDot:
         self,
         weight_maps: list,
         log_dir: Union[str, os.PathLike],
-        # mask_sig: bool,
+        mask_sig: bool,
     ):
         """Compute dot product of each weight map in parallel."""
+        log.write.info("Starting dot product calculations ...")
 
         def _emo_name(weight_path: Union[str, os.PathLike]) -> str:
             """Return emotion name."""
@@ -342,7 +360,7 @@ class DoDot:
                     weight_path,
                     self._subj_deriv,
                     log_dir,
-                    # mask_sig,
+                    mask_sig,
                 ),
             )
             for weight_path in weight_maps
@@ -355,6 +373,7 @@ class DoDot:
 
     def label_vol(self):
         """Aggregate emotion dataframes and assign volume labels."""
+        log.write.info("Aggregating volume dot products, labeling ...")
         csv_list = sorted(glob.glob(f"{self._subj_deriv}/tmp_df_*csv"))
         if not csv_list:
             raise FileNotFoundError(

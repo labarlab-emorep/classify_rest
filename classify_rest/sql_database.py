@@ -13,6 +13,9 @@ import pandas as pd
 import pymysql
 import paramiko
 from sshtunnel import SSHTunnelForwarder
+from classify_rest import helper
+
+log = helper.MakeLogger(os.path.basename(__file__))
 
 
 class DbConnect:
@@ -48,7 +51,12 @@ class DbConnect:
     """
 
     def __init__(self):
-        """Set con attr as mysql connection."""
+        """Initialize DbConnect.
+
+        Set con attr as mysql connection.
+
+        """
+        log.write.info("Initializing DbConnect")
         try:
             os.environ["SQL_PASS"]
         except KeyError as e:
@@ -67,6 +75,7 @@ class DbConnect:
                 "No global variable 'RSA_LS2' defined in user env"
             ) from e
 
+        log.write.info("Connecting to MySQL server from DCC")
         self._connect_ssh()
         self.con = pymysql.connect(
             host="127.0.0.1",
@@ -78,6 +87,7 @@ class DbConnect:
 
     def _connect_ssh(self):
         """Start ssh tunnel."""
+        log.write.info("Starting SSH tunnel")
         rsa_keoki = paramiko.RSAKey.from_private_key_file(
             os.environ["RSA_LS2"]
         )
@@ -111,6 +121,7 @@ class DbConnect:
         db_con.exec_many(sql_cmd, tbl_input)
 
         """
+        log.write.info(f"Executing {sql_cmd}")
         with self._con_cursor() as cur:
             cur.executemany(sql_cmd, value_list)
             self.con.commit()
@@ -125,6 +136,7 @@ class DbConnect:
         rows = db_con.fetch_df(sql_cmd)
 
         """
+        log.write.info(f"Executing {sql_cmd}")
         with self._con_cursor() as cur:
             cur.execute(sql_cmd)
             rows = cur.fetchall()
@@ -132,6 +144,7 @@ class DbConnect:
 
     def close_con(self):
         """Close database connection."""
+        log.write.info("Disconnecting from server and closing SSH tunnel.")
         self.con.close()
         self._ssh_tunnel.stop()
 
@@ -140,7 +153,8 @@ class _KeyMap:
     """Supply mappings for db_emorep foreign keys."""
 
     def __init__(self, db_con: Type[DbConnect]):
-        """Initialize."""
+        """Initialize _KeyMap."""
+        log.write.info("Initializing _KeyMap.")
         self._db_con = db_con
         self._load_refs()
 
@@ -150,10 +164,10 @@ class _KeyMap:
             x[1]: x[0]
             for x in self._db_con.fetch_rows("select * from ref_sess")
         }
-        # self._ref_mask = {
-        #     x[1]: x[0]
-        #     for x in self._db_con.fetch_rows("select * from ref_mask")
-        # }
+        self._ref_mask = {
+            x[1]: x[0]
+            for x in self._db_con.fetch_rows("select * from ref_mask")
+        }
         self._ref_tpl = {
             x[1]: x[0]
             for x in self._db_con.fetch_rows("select * from ref_tpl")
@@ -188,12 +202,7 @@ class _KeyMap:
         return self._ref_sess[sess_low]
 
     def mask_map(self, mask: str, mask_sig: bool) -> int:
-        """Return mask_id.
-
-        Deprecated.
-
-        """
-        return
+        """Return mask_id."""
         if mask_sig:
             return self._ref_mask["Sig Voxel"]
         return self._ref_mask["GM"]
@@ -257,9 +266,10 @@ def db_update(
     task_name: str,
     con_name: str,
     clf_tpl: str,
-    # mask_sig: bool,
+    mask_sig: bool,
 ) -> list:
     """Make df compliant with db_emorep, return list of tuples."""
+    log.write.info("Starting db_update")
     # Add foreign key columns
     db_con = DbConnect()
     km = _KeyMap(db_con)
@@ -268,11 +278,16 @@ def db_update(
     df["fsl_task_id"] = km.fsl_task_map(task_name)
     df["fsl_model_id"] = km.fsl_model_map(model_name)
     df["fsl_con_id"] = km.fsl_con_map(con_name)
-    # df["mask_id"] = km.mask_map(mask_name, mask_sig)
+
+    # Patch (2025-06-02 NM): integrate with new db_emorep.ref_tpl. Use ref_tpl
+    # as mask id, and reference db_emorep.ref_mask for GM/Sig designation.
+    # Write GM/Sig designation to new field (mask_type).
+    df["mask_type"] = km.mask_map(mask_name, mask_sig)
     df["mask_id"] = km.mask_tpl(clf_tpl)
 
     # Replace alpha emo with key value
     df["label_max"] = df.apply(lambda x: km.emo_label(x, "label_max"), axis=1)
+    log.write.debug(f"Input data for tbl_dotprod_{proj_name}:\n{df}")
 
     # Generate input for execute many
     sql_cmd = (

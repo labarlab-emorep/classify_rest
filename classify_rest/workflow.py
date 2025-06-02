@@ -5,7 +5,6 @@ ClassRest : compute dot product for each volume x emotion
 
 """
 
-# %%
 import os
 import glob
 from typing import Union
@@ -17,7 +16,6 @@ from func_model.resources import group
 log = helper.MakeLogger(os.path.basename(__file__))
 
 
-# %%
 def wf_setup(
     proj_name,
     work_deriv,
@@ -63,7 +61,6 @@ def wf_setup(
         Whether to compute dotprod on signficant voxels
 
     """
-    # print("Running workflow.wf_setup ...")
     log.write.info("Running workflow.wf_setup ...")
 
     # Download required files from Keoki
@@ -164,7 +161,6 @@ class ClassRest:
     log_dir : str, os.PathLike
         Location of output directory for logging
     mask_sig : bool
-        Deprecated.
         Whether to compute dotprod on signficant voxels
 
     Methods
@@ -191,7 +187,7 @@ class ClassRest:
         clf_tpl,
         work_deriv,
         log_dir,
-        # mask_sig,
+        mask_sig,
     ):
         """Initialize."""
         log.write.info("Initiating ClassRest")
@@ -205,10 +201,11 @@ class ClassRest:
             if task_name != "match"
             else sql_database.get_sess_name(subj, sess)
         )
+        self._clf_tpl = clf_tpl
         self._con_name = con_name
         self._work_deriv = work_deriv
         self._log_dir = log_dir
-        # self._mask_sig = mask_sig
+        self._mask_sig = mask_sig
 
         # Check options and get data sync object
         helper.check_proj_sess(proj_name, [sess])
@@ -221,7 +218,7 @@ class ClassRest:
         if sql_database.db_check(
             self._subj, self._sess, self._proj_name, self._task_name
         ):
-            print(
+            log.write.info(
                 f"Data found in db_emorep.tbl_dotprod_{self._proj_name} "
                 + f"for {self._subj}, {self._sess}, {self._task_name}. "
                 + "Skipping ..."
@@ -251,7 +248,7 @@ class ClassRest:
         do_dot.calc_dot(
             self._weight_maps,
             self._log_dir,
-            # self._mask_sig,
+            self._mask_sig,
         )
         do_dot.label_vol()
         out_path = os.path.join(
@@ -260,9 +257,10 @@ class ClassRest:
             + f"con-{self._con_name}_task-{self._task_name}.csv",
         )
         do_dot.df_prod.to_csv(out_path, index=False)
+        log.write.debug(f"Dot product dataframe:\n{do_dot.df_prod}")
 
         # Update db_emorep.tbl_dotprod_*
-        print(
+        log.write.info(
             "Updating db_emorep.tbl_dotprod_* for "
             + f"{self._subj} {self._sess} ..."
         )
@@ -275,10 +273,12 @@ class ClassRest:
             self._model_name,
             self._task_name,
             self._con_name,
+            self._clf_tpl,
             self._mask_sig,
         )
 
         # Upload output and clean
+        log.write.info("Sending data to Keoki and cleaning work")
         self._ds.ul_rest(self._subj, self._sess)
         self._ds.clean_work(self._subj, self._sess)
 
@@ -303,6 +303,3 @@ class ClassRest:
             raise FileNotFoundError(
                 "Missing setup files, please execute workflow.wf_setup"
             )
-
-
-# %%

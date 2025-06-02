@@ -68,8 +68,8 @@ def _get_args():
     )
     parser.add_argument(
         "--mask-name",
-        choices=["tpl_GM_mask.nii.gz", "tpl_template-whole_GM_mask.nii.gz"],
-        default="tpl_GM_mask.nii.gz",
+        choices=["tpl_template-whole_GM_mask.nii.gz"],
+        default="tpl_template-whole_GM_mask.nii.gz",
         help=textwrap.dedent(
             """\
             Select template mask
@@ -185,13 +185,12 @@ def main():
         if not os.path.exists(chk_dir):
             os.makedirs(chk_dir)
 
-    # Add support for mask names including tpl_GM_mask,
-    # tpl_template-cortex_*_mask and tpl_template-whole_*_mask.
+    # Patch (2025-06-02, NM): Deprecate support for tpl_GM_mask, add support
+    #  for tpl_template-cortex_*_mask and tpl_template-whole_*_mask.
     # TODO: func_model.resource.group.ImportanceMasks.sql_masks only supports
     #       "whole" and "cortex" as input, will break for visual, limbic, etc.
     # TODO: also relevant for extracting data from tbl_plsda_importance_*.
-    # TODO: if tpl_GM_mask is used, will reference ref_voxel_gm_whole (the
-    #       wrong table). Consider deprecating tpl_GM_mask.
+    # TODO: update tbl_dotprod_archival for updated workflow.
     _mask = mask_name.split("tpl_")[1].split("_mask")[0]
     clf_tpl = (
         _mask.split("-")[1].split("_")[0] if "template" in _mask else "whole"
