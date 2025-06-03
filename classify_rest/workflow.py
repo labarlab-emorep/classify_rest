@@ -5,7 +5,6 @@ ClassRest : compute dot product for each volume x emotion
 
 """
 
-# %%
 import os
 import glob
 from typing import Union
@@ -14,8 +13,9 @@ from classify_rest import process
 from classify_rest import sql_database
 from func_model.resources import group
 
+log = helper.MakeLogger(os.path.basename(__file__))
 
-# %%
+
 def wf_setup(
     proj_name,
     work_deriv,
@@ -23,6 +23,7 @@ def wf_setup(
     model_name,
     task_name,
     con_name,
+    clf_tpl,
     log_dir,
     mask_sig,
 ):
@@ -39,7 +40,7 @@ def wf_setup(
     work_deriv : str, os.PathLike
         Location of output parent directory
     mask_name : str
-        {"tpl_GM_mask.nii.gz"}
+        {"tpl_GM_mask.nii.gz", "tpl_template-whole_GM_mask.nii.gz"}
         File name of mask used in beta extraction
     model_name : str
         {"sep", "tog"}
@@ -51,36 +52,56 @@ def wf_setup(
     con_name : str
         {"stim", "replay", "tog"}
         Contrast name (e.g. stimWashout) from first-level models
+    clf_tpl : str
+        {"whole", "cortex"}
+        The template used for classification
     log_dir : str, os.PathLike
         Location of output directory for logging
     mask_sig : bool
         Whether to compute dotprod on signficant voxels
 
     """
-    print("Running workflow.wf_setup ...")
+    log.write.info("Running workflow.wf_setup ...")
 
     # Download required files from Keoki
+    log.write.info("Downloading mask")
     ds = helper.DataSync(proj_name, work_deriv)
     mask_path = ds.dl_gm_mask(mask_name)
 
     # Determine MNI coordinate from mask, get emotion list
+    log.write.info("Building importance mask")
     mk_mask = group.ImportanceMask(mask_path)
     emo_list = mk_mask.emo_names()
+    log.write.debug(f"emo_list: {emo_list}")
 
     def _build_mask(
         class_name: str, mask_type: str
     ) -> Union[str, os.PathLike]:
         """Wrap mk_mask.sql_mask."""
+        # Set output name, avoid repeating work
         out_path = os.path.join(
             work_deriv,
             f"{mask_type}_model-{model_name}_task-{class_name}_"
-            + f"con-{con_name}_emo-{emo_name}_map.nii.gz",
+            + f"con-{con_name}_emo-{emo_name}_tpl-{clf_tpl}_map.nii.gz",
         )
+        log.write.info(f"Making map: {out_path}")
         if os.path.exists(out_path):
             return out_path
-        return mk_mask.sql_masks(
-            class_name, model_name, con_name, emo_name, mask_type, work_deriv
+
+        # Make and verify mask
+        out_path = mk_mask.sql_masks(
+            class_name,
+            model_name,
+            con_name,
+            emo_name,
+            mask_type,
+            clf_tpl,
+            work_deriv,
         )
+        if not os.path.exists(out_path):
+            log.write.error(f"Missing map: {out_path}")
+            raise FileNotFoundError(out_path)
+        return out_path
 
     def _org_build(mask_type: str) -> Union[list, str, os.PathLike]:
         """Determine which masks to build."""
@@ -92,10 +113,8 @@ def wf_setup(
         else:
             return _build_mask(task_name, mask_type)
 
-    # Make masks for each emotion classifier
+    # Make importance and significance masks for each emotion classifier
     for emo_name in emo_list:
-
-        # Make mask for voxels importance, significance
         _ = _org_build("importance")
         if mask_sig:
             _ = _org_build("binary")
@@ -122,7 +141,7 @@ class ClassRest:
         {"emorep", "archival"}
         Project name
     mask_name : str
-        {"tpl_GM_mask.nii.gz"}
+        {"tpl_GM_mask.nii.gz", "tpl_template-whole_GM_mask.nii.gz"}
         File name of mask used in beta extraction
     model_name : str
         {"sep", "tog"}
@@ -134,6 +153,9 @@ class ClassRest:
     con_name : str
         {"stim", "replay", "tog"}
         Contrast name (e.g. stimWashout) from first-level models
+    clf_tpl : str
+        {"whole", "cortex"}
+        The template used for classification
     work_deriv : str, os.PathLike
         Location of output parent directory
     log_dir : str, os.PathLike
@@ -162,11 +184,13 @@ class ClassRest:
         model_name,
         task_name,
         con_name,
+        clf_tpl,
         work_deriv,
         log_dir,
         mask_sig,
     ):
         """Initialize."""
+        log.write.info("Initiating ClassRest")
         self._subj = subj
         self._sess = sess
         self._proj_name = proj_name
@@ -177,6 +201,7 @@ class ClassRest:
             if task_name != "match"
             else sql_database.get_sess_name(subj, sess)
         )
+        self._clf_tpl = clf_tpl
         self._con_name = con_name
         self._work_deriv = work_deriv
         self._log_dir = log_dir
@@ -188,11 +213,12 @@ class ClassRest:
 
     def label_vols(self):
         """Compute dot product and label each volume."""
+        log.write.info("Starting label_vols")
         # Check for existing data in db_emorep.tbl_dotprod
         if sql_database.db_check(
             self._subj, self._sess, self._proj_name, self._task_name
         ):
-            print(
+            log.write.info(
                 f"Data found in db_emorep.tbl_dotprod_{self._proj_name} "
                 + f"for {self._subj}, {self._sess}, {self._task_name}. "
                 + "Skipping ..."
@@ -208,6 +234,7 @@ class ClassRest:
         self._setup()
 
         # Convert volume values to zscore and split
+        log.write.info("Starting zscore_vols workflow")
         res_vols = process.zscore_vols(
             self._res_path,
             self._mask_path,
@@ -216,6 +243,7 @@ class ClassRest:
         )
 
         # Conduct dot product calculations and volume label
+        log.write.info("Calculating dot products")
         do_dot = process.DoDot(res_vols, out_dir, self._mask_path)
         do_dot.calc_dot(
             self._weight_maps,
@@ -229,9 +257,10 @@ class ClassRest:
             + f"con-{self._con_name}_task-{self._task_name}.csv",
         )
         do_dot.df_prod.to_csv(out_path, index=False)
+        log.write.debug(f"Dot product dataframe:\n{do_dot.df_prod}")
 
         # Update db_emorep.tbl_dotprod_*
-        print(
+        log.write.info(
             "Updating db_emorep.tbl_dotprod_* for "
             + f"{self._subj} {self._sess} ..."
         )
@@ -244,15 +273,18 @@ class ClassRest:
             self._model_name,
             self._task_name,
             self._con_name,
+            self._clf_tpl,
             self._mask_sig,
         )
 
         # Upload output and clean
+        log.write.info("Sending data to Keoki and cleaning work")
         self._ds.ul_rest(self._subj, self._sess)
         self._ds.clean_work(self._subj, self._sess)
 
     def _setup(self):
         """Download and check for required files."""
+        log.write.info("Running setup for label_vols")
         # Get cleaned resting data
         self._res_path = self._ds.dl_rest(self._subj, self._sess)
         if not os.path.exists(self._res_path):
@@ -271,6 +303,3 @@ class ClassRest:
             raise FileNotFoundError(
                 "Missing setup files, please execute workflow.wf_setup"
             )
-
-
-# %%
