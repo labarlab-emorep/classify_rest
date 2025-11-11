@@ -1,4 +1,4 @@
-#!/bin/env /hpc/group/labarlab/research_bin/conda_envs/emorep/bin/python
+#!/bin/env [[CLUSTER CONDA PYTHON BINARY LOCATION]]
 """
 Submit classify_rest workflow for subject from scheduled array.
 
@@ -78,8 +78,8 @@ def main():
     mask_name = "tpl_GM_mask.nii.gz"
     model_name = "sep"
     con_name = "stim"
-    work_deriv = f"/work/{os.environ['USER']}/EmoRep/classify_rest"
-    log_dir = f"/work/{os.environ['USER']}/EmoRep/logs/classify_rest_batch"
+    work_deriv = f"{os.environ["WORK_DIR"]}/{os.environ['USER']}/EmoRep/classify_rest"
+    log_dir = f"{os.environ["WORK_DIR"]}/{os.environ['USER']}/EmoRep/logs/classify_rest_batch"
     mask_sig = True
 
     # Setup working directories

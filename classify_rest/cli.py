@@ -10,7 +10,7 @@ mysql db_emorep.tbl_dotprod_*.
 Notes
 -----
 - Requires the following global variables in user environment:
-    - RSA_LS2 : location of RSA key to labarserv2
+    - RSA_LS2 : location of RSA key to the lab server
     - SING_AFNI : location of AFNI singularity image
     - SQL_PASS : password for mysql db_emorep
 - Options contrast-name, model-name, and task-name are used
@@ -171,7 +171,7 @@ def main():
     # Setup working, logging dirs
     dir_name = "EmoRep" if proj_name == "emorep" else "Archival"
     work_deriv = os.path.join(
-        "/work",
+        os.environ["WORK_DIR"],
         os.environ["USER"],
         f"{dir_name}/classify_rest",
     )

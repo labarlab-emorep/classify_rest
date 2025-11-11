@@ -26,7 +26,7 @@ function Usage {
 
     Example Usage:
         sbatch \\
-            --output=/work/$(whoami)/EmoRep/logs/classify_rest_array/slurm_%A_%a.log \\
+            --output=$WORK_DIR/$(whoami)/EmoRep/logs/classify_rest_array/slurm_%A_%a.log \\
             --array=0-153%14 \\
             array_cli.sh \\
             -e ses-day2 \\

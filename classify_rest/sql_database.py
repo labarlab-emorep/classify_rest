@@ -92,7 +92,7 @@ class DbConnect:
             os.environ["RSA_LS2"]
         )
         self._ssh_tunnel = SSHTunnelForwarder(
-            ("ccn-labarserv2.vm.duke.edu", 22),
+            (os.environ["SERVER_ADDR"], 22),
             ssh_username=os.environ["USER"],
             ssh_pkey=rsa_keoki,
             remote_bind_address=("127.0.0.1", 3306),

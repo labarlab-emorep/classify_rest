@@ -128,7 +128,7 @@ class ClassRest:
     according to the max value.
 
     Generated dataframes are uploaded to mysql db_emorep on
-    labarserv2, and CSVs are uploaded to Keoki.
+    the lab server, and CSVs are uploaded to Keoki.
 
     Parameters
     ----------

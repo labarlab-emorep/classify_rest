@@ -1,14 +1,14 @@
 # classify_rest
-This package calculates the dot product of rsfMRI data and classifier feature weights, used for both the EmoRep and NKI Archival data. It is written for execution on the Duke Computer Cluster, and will find required data on both Keoki and the MySQL databse `db_emorep`.
+This package calculates the dot product of rsfMRI data and classifier feature weights, used for both the EmoRep and NKI Archival data. It is written for execution on the Duke Computer Cluster, and will find required data on both the lab data server and the MySQL databse `db_emorep`.
 
 
 ## Setup
 * Install into project environment on the Duke Compute Cluster (DCC; see [here](https://github.com/labarlab/conda_dcc)) via `$python setup.py install`.
-* Generate an RSA key on the DCC for labarserv2
+* Generate an RSA key on the DCC for the lab server
 * Set the following global variables:
-    * `RSA_LS2` to store the path to the RSA key for labarserv2
+    * `RSA_LS2` to store the path to the RSA key for the lab server
     * `SING_AFNI` to store the path to the AFNI singularity image
-    * `SQL_PASS` to store the user password to the MySQL databse `db_emorep` on labarserv2
+    * `SQL_PASS` to store the user password to the MySQL databse `db_emorep` on the lab server
 * Verify that the package `func_model` version >=4.3.1 is installed in the same environment
 
 
@@ -16,7 +16,7 @@ This package calculates the dot product of rsfMRI data and classifier feature we
 The CLI supplies a number of parameters (as well as their corresponding default arguments when optional) that allow the user to target a project and session for calculating dot products. Trigger help and usage via `$classify_rest`:
 
 ```
-(emorep)[nmm51-dcc: emorep]$classify_rest
+$classify_rest
 usage: classify_rest [-h] [--contrast-name {stim,replay,tog}] [--mask-name {tpl_GM_mask.nii.gz}] [--mask-sig]
                      [--model-name {sep,tog}] [--no-setup] [--task-name {movies,scenarios,both,match}] -e
                      {ses-day2,ses-day3,ses-BAS1} [{ses-day2,ses-day3,ses-BAS1} ...] -p {emorep,archival} -s SUB_LIST
@@ -36,7 +36,7 @@ mysql db_emorep.tbl_dotprod_*.
 Notes
 -----
 - Requires the following global variables in user environment:
-    - RSA_LS2 : location of RSA key to labarserv2
+    - RSA_LS2 : location of RSA key to the lab server
     - SING_AFNI : location of AFNI singularity image
     - SQL_PASS : password for mysql db_emorep
 - Options contrast-name, model-name, and task-name are used
@@ -106,15 +106,15 @@ There are two main workflows involved in generating dot products. The first is '
 1. (Optional) Generate a binary mask for each emotion from values found in `db_emorep.tbl_plsda_binary*`, named 'binary_\<model\>\_\<task\>\_\<contrast\>_\<emotion\>_map.nii.gz'
 
 Next, dot products are calculated for all subjects specified:
-1. Download cleaned rsfMRI output from Keoki (output of [func_model.cli.fsl_model](https://github.com/labarlab-emorep/func_model#fsl_model) when using `--model-name rest`)
+1. Download cleaned rsfMRI output from the lab data server (output of [func_model.cli.fsl_model](https://github.com/labarlab-emorep/func_model#fsl_model) when using `--model-name rest`)
 1. Verify that MySQL table `db_emorep.tbl_dotprod_*` does not already have existing data for subject, session, task
 1. Parallelize the splitting and z-scoring of each volume
 1. Parallelize calculating the dot product of each volume with each emotion's importance map
 1. Aggregate volume dot products and identify largest value of each volume
 1. Update `db_emorep.tbl_dotprod_*` with the dot products dataframe
-1. Upload dataframes to Keoki and clean up files on DCC
+1. Upload dataframes to the lab data server and clean up files on DCC
 
-Currently, individual dot product dataframes for subjects and sessions are available in the derivatives directory on Keoki, but this may be deprecated as the data exist in the SQL database:
+Currently, individual dot product dataframes for subjects and sessions are available in the derivatives directory on the lab data server, but this may be deprecated as the data exist in the SQL database:
 
 ```
 derivatives/classify_rest/

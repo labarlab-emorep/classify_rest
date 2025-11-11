@@ -4,7 +4,7 @@ check_rsa : check env for RSA key
 check_afni : check env for afni singularity path
 chk_sql_pass : check env for mysql password
 check_proj_sess : check if proj_name, sess list match
-KeokiPaths : supply addresses and paths for labarserv2, keoki
+ServerPaths : supply addresses and paths for the lab server and lab data server
 DataSync : manage data down/uploads
 MakeLogger: Supply logging object.
 
@@ -62,7 +62,7 @@ def check_proj_sess(proj_name: str, sess_list: list):
                 raise ValueError(f"Unexpected session for archival : {sess}")
 
 
-class KeokiPaths:
+class ServerPaths:
     """Make path properties available."""
 
     def __init__(self, proj_name: str):
@@ -70,13 +70,13 @@ class KeokiPaths:
         self._proj_name = proj_name
 
     @property
-    def labarserv2_ip(self) -> str:
-        """Return local IP of labarserv2."""
-        return "ccn-labarserv2.vm.duke.edu"
+    def labserver_ip(self) -> str:
+        """Return local IP of the lab server."""
+        return os.environ["SERVER_ADDR"]
 
     @property
-    def keoki_emorep(self) -> Union[str, os.PathLike]:
-        """Return project parent directory path on Keoki."""
+    def server_emorep(self) -> Union[str, os.PathLike]:
+        """Return project parent directory path on the lab data server."""
         return "/mnt/keoki/experiments2/EmoRep"
 
     @property
@@ -87,16 +87,16 @@ class KeokiPaths:
             if self._proj_name == "emorep"
             else "Exp3_Classify_Archival/data_mri_BIDS"
         )
-        return os.path.join(self.keoki_emorep, mri_dir, "derivatives")
+        return os.path.join(self.server_emorep, mri_dir, "derivatives")
 
 
-class DataSync(KeokiPaths):
+class DataSync(ServerPaths):
     """Synchronize data between DCC and Keoki.
 
     Download data from, and upload data to, Keoki using
-    labarserv2.
+    the lab server.
 
-    Inherits KeokiPaths.
+    Inherits ServerPaths.
 
     Methods
     -------
@@ -127,7 +127,7 @@ class DataSync(KeokiPaths):
 
         # Download template from Exp2, return file path
         src_path = os.path.join(
-            self.keoki_emorep,
+            self.server_emorep,
             "Exp2_Compute_Emotion/analyses/model_fsl_group",
             mask_name,
         )
@@ -138,7 +138,7 @@ class DataSync(KeokiPaths):
     ) -> Union[str, os.PathLike]:
         """Submit download command for file, return file path."""
         print(f"Downloading : {os.path.basename(file_path)}")
-        src = f"{self._user}@{self.labarserv2_ip}:{file_path}"
+        src = f"{self._user}@{self.labserver_ip}:{file_path}"
         _, _ = self._submit_rsync(src, self._work_deriv)
 
         # Check for file, return path
@@ -148,7 +148,7 @@ class DataSync(KeokiPaths):
         return chk_dl
 
     def _submit_rsync(self, src: str, dst: str) -> Tuple:
-        """Execute rsync between DCC and labarserv2."""
+        """Execute rsync between DCC and the lab server."""
         bash_cmd = f"""\
             rsync \
             -e 'ssh -i {os.environ["RSA_LS2"]}' \
@@ -176,7 +176,7 @@ class DataSync(KeokiPaths):
 
         # Download weight file from Exp2 and return path
         src_path = os.path.join(
-            self.keoki_emorep,
+            self.server_emorep,
             "Exp2_Compute_Emotion/analyses/classify_fMRI_plsda",
             "classifier_output",
             weight_name,
@@ -198,7 +198,7 @@ class DataSync(KeokiPaths):
             return res4d_list[0]
 
         # Download, check, and return file path
-        src = f"{self._user}@{self.labarserv2_ip}:{self._keoki_rs_path}"
+        src = f"{self._user}@{self.labserver_ip}:{self._keoki_rs_path}"
         _, _ = self._submit_rsync(src, dst)
         res4d_list = sorted(glob.glob(f"{dst}/{self._rs_name}"))
         if not res4d_list:
@@ -223,7 +223,7 @@ class DataSync(KeokiPaths):
         src = os.path.join(self._work_deriv, subj, sess)
         self._clean_subj(src)
         dst_path = f"{self.keoki_deriv}/classify_rest/{subj}"
-        dst = f"{self._user}@{self.labarserv2_ip}:{dst_path}"
+        dst = f"{self._user}@{self.labserver_ip}:{dst_path}"
         self._make_dst(dst_path)
         _, _ = self._submit_rsync(src, dst)
 
@@ -242,7 +242,7 @@ class DataSync(KeokiPaths):
         make_dst = f"""\
             ssh \
                 -i {os.environ["RSA_LS2"]} \
-                {self._user}@{self.labarserv2_ip} \
+                {self._user}@{self.labserver_ip} \
                 " command ; bash -c 'mkdir -p {dst}'"
         """
         _, _ = submit.submit_subprocess(make_dst)
