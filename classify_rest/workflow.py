@@ -29,7 +29,7 @@ def wf_setup(
 ):
     """Get classifier output weights and mask.
 
-    Download template mask and classifier weight matrix from Keoki,
+    Download template mask and classifier weight matrix from lab data server,
     then generate a weight map in MNI space for each emotion.
 
     Parameters
@@ -63,7 +63,7 @@ def wf_setup(
     """
     log.write.info("Running workflow.wf_setup ...")
 
-    # Download required files from Keoki
+    # Download required files from lab data server
     log.write.info("Downloading mask")
     ds = helper.DataSync(proj_name, work_deriv)
     mask_path = ds.dl_gm_mask(mask_name)
@@ -128,7 +128,7 @@ class ClassRest:
     according to the max value.
 
     Generated dataframes are uploaded to mysql db_emorep on
-    the lab server, and CSVs are uploaded to Keoki.
+    the lab server, and CSVs are uploaded to lab data server.
 
     Parameters
     ----------
@@ -278,7 +278,7 @@ class ClassRest:
         )
 
         # Upload output and clean
-        log.write.info("Sending data to Keoki and cleaning work")
+        log.write.info("Sending data to lab data server and cleaning work")
         self._ds.ul_rest(self._subj, self._sess)
         self._ds.clean_work(self._subj, self._sess)
 

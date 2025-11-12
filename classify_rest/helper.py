@@ -77,11 +77,11 @@ class ServerPaths:
     @property
     def server_emorep(self) -> Union[str, os.PathLike]:
         """Return project parent directory path on the lab data server."""
-        return "/mnt/keoki/experiments2/EmoRep"
+        return os.environ["SERVER_STUDY_DIR"]
 
     @property
-    def keoki_deriv(self) -> Union[str, os.PathLike]:
-        """Return project derivatives path on Keoki."""
+    def server_deriv(self) -> Union[str, os.PathLike]:
+        """Return project derivatives path on lab data server."""
         mri_dir = (
             "Exp2_Compute_Emotion/data_scanner_BIDS"
             if self._proj_name == "emorep"
@@ -91,9 +91,9 @@ class ServerPaths:
 
 
 class DataSync(ServerPaths):
-    """Synchronize data between DCC and Keoki.
+    """Synchronize data between DCC and lab data server.
 
-    Download data from, and upload data to, Keoki using
+    Download data from, and upload data to, lab data server using
     the lab server.
 
     Inherits ServerPaths.
@@ -108,7 +108,7 @@ class DataSync(ServerPaths):
     dl_rest()
         Download cleaned resting state data (res4d.nii.gz)
     ul_rest()
-        Upload workflow output to Keoki
+        Upload workflow output to lab data server
 
     """
 
@@ -198,7 +198,7 @@ class DataSync(ServerPaths):
             return res4d_list[0]
 
         # Download, check, and return file path
-        src = f"{self._user}@{self.labserver_ip}:{self._keoki_rs_path}"
+        src = f"{self._user}@{self.labserver_ip}:{self._server_rs_path}"
         _, _ = self._submit_rsync(src, dst)
         res4d_list = sorted(glob.glob(f"{dst}/{self._rs_name}"))
         if not res4d_list:
@@ -207,10 +207,10 @@ class DataSync(ServerPaths):
         return res4d_list[0]
 
     @property
-    def _keoki_rs_path(self) -> Union[str, os.PathLike]:
-        """Return path to cleaned resting data on Keoki."""
+    def _server_rs_path(self) -> Union[str, os.PathLike]:
+        """Return path to cleaned resting data on lab data server."""
         return os.path.join(
-            self.keoki_deriv,
+            self.server_deriv,
             "model_fsl",
             self._subj,
             self._sess,
@@ -219,10 +219,10 @@ class DataSync(ServerPaths):
         )
 
     def ul_rest(self, subj: str, sess: str):
-        """Clean intermediates and upload relevant files to Keoki."""
+        """Clean intermediates and upload relevant files to lab data server."""
         src = os.path.join(self._work_deriv, subj, sess)
         self._clean_subj(src)
-        dst_path = f"{self.keoki_deriv}/classify_rest/{subj}"
+        dst_path = f"{self.server_deriv}/classify_rest/{subj}"
         dst = f"{self._user}@{self.labserver_ip}:{dst_path}"
         self._make_dst(dst_path)
         _, _ = self._submit_rsync(src, dst)
@@ -238,7 +238,7 @@ class DataSync(ServerPaths):
                 os.remove(file_path)
 
     def _make_dst(self, dst: Union[str, os.PathLike]):
-        """Make output destination on Keoki."""
+        """Make output destination on lab data server."""
         make_dst = f"""\
             ssh \
                 -i {os.environ["RSA_LS2"]} \

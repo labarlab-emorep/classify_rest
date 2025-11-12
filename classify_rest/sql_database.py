@@ -88,13 +88,13 @@ class DbConnect:
     def _connect_ssh(self):
         """Start ssh tunnel."""
         log.write.info("Starting SSH tunnel")
-        rsa_keoki = paramiko.RSAKey.from_private_key_file(
+        rsa_server = paramiko.RSAKey.from_private_key_file(
             os.environ["RSA_LS2"]
         )
         self._ssh_tunnel = SSHTunnelForwarder(
             (os.environ["SERVER_ADDR"], 22),
             ssh_username=os.environ["USER"],
-            ssh_pkey=rsa_keoki,
+            ssh_pkey=rsa_server,
             remote_bind_address=("127.0.0.1", 3306),
         )
         self._ssh_tunnel.start()
