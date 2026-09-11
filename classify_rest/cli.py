@@ -209,7 +209,7 @@ def main():
             log_dir,
             mask_sig,
         )
-
+    raise RuntimeError("Exitting after setup!")
     # Conduct workflow for each subject, session
     print("Submitting workflow ...")
     for subj in subj_list:
